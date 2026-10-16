@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#1a3a32" />
+  <title>Digital Register</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #14261f;
+      --ink-soft: #3d5349;
+      --paper: #eef3ef;
+      --paper-deep: #dce6df;
+      --line: #b7c7bd;
+      --accent: #1a3a32;
+      --accent-bright: #2d6a5a;
+      --payment: #8b3a2f;
+      --danger: #9b2c2c;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      font-family: "Source Sans 3", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(120% 80% at 10% -10%, rgba(45, 106, 90, 0.18), transparent 55%),
+        radial-gradient(90% 60% at 100% 0%, rgba(26, 58, 50, 0.12), transparent 50%),
+        linear-gradient(180deg, #f5f8f6 0%, var(--paper) 40%, var(--paper-deep) 100%);
+      padding: calc(1rem + var(--safe-top)) 1rem calc(1.5rem + var(--safe-bottom));
+    }
+
+    .app {
+      width: min(960px, 100%);
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 1.25rem;
+      animation: rise 0.55s ease-out both;
+    }
+
+    .brand {
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: clamp(2rem, 7vw, 2.75rem);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+      margin: 0;
+    }
+
+    .tagline {
+      margin: 0.4rem 0 0;
+      color: var(--ink-soft);
+      font-size: 0.98rem;
+      max-width: 36ch;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(183, 199, 189, 0.85);
+      border-radius: var(--radius);
+      padding: 1rem;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(20, 38, 31, 0.06);
+      animation: rise 0.6s ease-out 0.08s both;
+    }
+
+    .balance-block {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    @media (min-width: 640px) {
+      .balance-block {
+        grid-template-columns: 1fr auto;
+        align-items: end;
+      }
+    }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      margin-bottom: 0.3rem;
+    }
+
+    input {
+      width: 100%;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.7rem 0.75rem;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input:focus {
+      border-color: var(--accent-bright);
+      box-shadow: 0 0 0 3px rgba(45, 106, 90, 0.18);
+    }
+
+    input[type="number"],
+    .money,
+    .balance-value,
+    .txn-balance,
+    .col-balance {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .balance-summary {
+      text-align: left;
+    }
+
+    @media (min-width: 640px) {
+      .balance-summary { text-align: right; }
+    }
+
+    .balance-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+
+    .balance-value {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 1.55rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .balance-value.neg { color: var(--payment); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.85rem;
+    }
+
+    button {
+      font: inherit;
+      font-weight: 600;
+      border: none;
+      border-radius: 999px;
+      padding: 0.65rem 1rem;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.12s ease, background 0.15s ease;
+    }
+
+    button:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #f4faf7;
+      flex: 1 1 auto;
+    }
+
+    .btn-primary:hover { background: var(--accent-bright); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid rgba(155, 44, 44, 0.35);
+    }
+
+    .list {
+      display: grid;
+      gap: 0.75rem;
+      animation: rise 0.65s ease-out 0.14s both;
+    }
+
+    .txn {
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(183, 199, 189, 0.9);
+      border-radius: var(--radius);
+      padding: 0.85rem;
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    .txn.entering { animation: slideIn 0.35s ease-out both; }
+
+    .txn-top,
+    .txn-money {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.55rem;
+    }
+
+    .txn-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      padding-top: 0.2rem;
+      border-top: 1px dashed var(--line);
+    }
+
+    .txn-balance {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .txn-balance.neg { color: var(--payment); }
+
+    /* Wider screens: classic register columns */
+    .table-wrap {
+      display: none;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid rgba(183, 199, 189, 0.9);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    table.register {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+
+    table.register th {
+      text-align: left;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      padding: 0.75rem 0.5rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(238, 243, 239, 0.85);
+      white-space: nowrap;
+    }
+
+    table.register td {
+      padding: 0.4rem 0.35rem;
+      border-bottom: 1px solid rgba(183, 199, 189, 0.55);
+      vertical-align: middle;
+    }
+
+    table.register tr:last-child td { border-bottom: none; }
+
+    table.register input {
+      padding: 0.55rem 0.5rem;
+      border-radius: 8px;
+    }
+
+    .col-num { width: 7rem; }
+    .col-date { width: 9.5rem; }
+    .col-desc { min-width: 12rem; }
+    .col-pay, .col-dep { width: 8.5rem; }
+    .col-bal {
+      width: 7.5rem;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+      padding-right: 0.75rem !important;
+    }
+    .col-bal.neg { color: var(--payment); }
+    .col-act { width: 5.5rem; text-align: right; }
+
+    .empty {
+      text-align: center;
+      padding: 1.5rem 1rem;
+      color: var(--ink-soft);
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .hint {
+      margin: 0.85rem 0 0;
+      font-size: 0.8rem;
+      color: var(--ink-soft);
+      line-height: 1.4;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(1rem + var(--safe-bottom));
+      transform: translateX(-50%) translateY(120%);
+      background: var(--ink);
+      color: #f4faf7;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      z-index: 20;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    @media (min-width: 780px) {
+      .list { display: none; }
+      .table-wrap { display: block; animation: rise 0.65s ease-out 0.14s both; }
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1 class="brand">Digital Register</h1>
+      <p class="tagline">A pocket checkbook with a running balance—saved on your phone and shareable by link.</p>
+    </header>
+
+    <section class="panel" aria-labelledby="balance-heading">
+      <div class="balance-block">
+        <div>
+          <label for="beginning-balance" id="balance-heading">Beginning balance</label>
+          <input
+            id="beginning-balance"
+            class="money"
+            type="number"
+            inputmode="decimal"
+            step="0.01"
+            placeholder="0.00"
+            autocomplete="off"
+          />
+        </div>
+        <div class="balance-summary">
+          <span class="balance-label">Current balance</span>
+          <span id="running-balance" class="balance-value">$0.00</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button type="button" class="btn-primary" id="add-txn">Add entry</button>
+        <button type="button" class="btn-ghost" id="share-link">Copy share link</button>
+        <button type="button" class="btn-danger" id="clear-all">Clear</button>
+      </div>
+
+      <div id="txn-list" class="list" aria-live="polite"></div>
+
+      <div class="table-wrap" aria-live="polite">
+        <table class="register" id="txn-table">
+          <thead>
+            <tr>
+              <th class="col-num">No. / Code</th>
+              <th class="col-date">Date</th>
+              <th class="col-desc">Transaction description</th>
+              <th class="col-pay">Payment / fee / withdrawal</th>
+              <th class="col-dep">Deposit</th>
+              <th class="col-bal">Balance</th>
+              <th class="col-act"></th>
+            </tr>
+          </thead>
+          <tbody id="txn-tbody"></tbody>
+        </table>
+      </div>
+
+      <p class="hint">
+        Edits save in this browser and in the page URL hash—bookmark or send the link to keep your register with you.
+      </p>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = "digital-register-v1";
+      const beginningInput = document.getElementById("beginning-balance");
+      const runningEl = document.getElementById("running-balance");
+      const listEl = document.getElementById("txn-list");
+      const tbodyEl = document.getElementById("txn-tbody");
+      const toastEl = document.getElementById("toast");
+      let toastTimer = null;
+      let saveTimer = null;
+      let state = { beginning: 0, txns: [] };
+
+      function uid() {
+        return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      }
+
+      function todayISO() {
+        const d = new Date();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return d.getFullYear() + "-" + m + "-" + day;
+      }
+
+      function parseMoney(value) {
+        if (value === "" || value === null || value === undefined) return 0;
+        const n = Number(value);
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function formatMoney(n) {
+        const abs = Math.abs(n);
+        const formatted = abs.toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+        });
+        return n < 0 ? "-" + formatted : formatted;
+      }
+
+      function encodeState(data) {
+        const json = JSON.stringify(data);
+        const bytes = new TextEncoder().encode(json);
+        let binary = "";
+        bytes.forEach(function (b) { binary += String.fromCharCode(b); });
+        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      }
+
+      function decodeState(hash) {
+        try {
+          let b64 = hash.replace(/^#/, "").replace(/-/g, "+").replace(/_/g, "/");
+          while (b64.length % 4) b64 += "=";
+          const binary = atob(b64);
+          const bytes = Uint8Array.from(binary, function (c) { return c.charCodeAt(0); });
+          const data = JSON.parse(new TextDecoder().decode(bytes));
+          if (typeof data !== "object" || data === null) return null;
+          return {
+            beginning: parseMoney(data.beginning),
+            txns: Array.isArray(data.txns)
+              ? data.txns.map(function (t) {
+                  return {
+                    id: t.id || uid(),
+                    code: String(t.code || ""),
+                    date: String(t.date || todayISO()),
+                    description: String(t.description || ""),
+                    payment: parseMoney(t.payment),
+                    deposit: parseMoney(t.deposit),
+                  };
+                })
+              : [],
+          };
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function loadState() {
+        const fromHash = location.hash && location.hash.length > 1 ? decodeState(location.hash) : null;
+        if (fromHash) {
+          state = fromHash;
+          persist(false);
+          return;
+        }
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            state = {
+              beginning: parseMoney(parsed.beginning),
+              txns: Array.isArray(parsed.txns) ? parsed.txns : [],
+            };
+            return;
+          }
+        } catch (e) { /* ignore */ }
+        state = { beginning: 0, txns: [] };
+      }
+
+      function persist(updateHash) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) { /* ignore */ }
+        if (updateHash !== false) {
+          const encoded = encodeState(state);
+          if (history.replaceState) {
+            history.replaceState(null, "", "#" + encoded);
+          } else {
+            location.hash = encoded;
+          }
+        }
+      }
+
+      function schedulePersist() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () { persist(true); }, 120);
+      }
+
+      function showToast(message) {
+        toastEl.textContent = message;
+        toastEl.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+          toastEl.classList.remove("show");
+        }, 1800);
+      }
+
+      function runningBalances() {
+        let bal = parseMoney(state.beginning);
+        return state.txns.map(function (txn) {
+          bal = bal - parseMoney(txn.payment) + parseMoney(txn.deposit);
+          return bal;
+        });
+      }
+
+      function updateRunningDisplay(bals) {
+        const finalBal = bals.length ? bals[bals.length - 1] : parseMoney(state.beginning);
+        runningEl.textContent = formatMoney(finalBal);
+        runningEl.classList.toggle("neg", finalBal < 0);
+      }
+
+      function bindFields(root, txn, onMoneyChange) {
+        root.querySelectorAll("[data-field]").forEach(function (el) {
+          function onField(e) {
+            const field = e.target.getAttribute("data-field");
+            let value = e.target.value;
+            if (field === "payment" || field === "deposit") {
+              value = parseMoney(value);
+              txn[field] = value;
+              onMoneyChange();
+            } else {
+              txn[field] = value;
+            }
+            schedulePersist();
+          }
+          el.addEventListener("input", onField);
+          el.addEventListener("change", onField);
+        });
+      }
+
+      function render(animateId) {
+        beginningInput.value =
+          state.beginning === 0 || state.beginning === ""
+            ? ""
+            : String(state.beginning);
+
+        const bals = runningBalances();
+        listEl.innerHTML = "";
+        tbodyEl.innerHTML = "";
+
+        if (!state.txns.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "No entries yet. Tap Add entry to start your register.";
+          listEl.appendChild(empty);
+
+          const emptyRow = document.createElement("tr");
+          emptyRow.innerHTML =
+            '<td colspan="7" style="text-align:center;color:var(--ink-soft);padding:1.25rem;">No entries yet. Click Add entry to start.</td>';
+          tbodyEl.appendChild(emptyRow);
+          updateRunningDisplay(bals);
+          return;
+        }
+
+        state.txns.forEach(function (txn, index) {
+          const bal = bals[index];
+
+          const card = document.createElement("article");
+          card.className = "txn" + (txn.id === animateId ? " entering" : "");
+          card.dataset.id = txn.id;
+          card.innerHTML =
+            '<div class="txn-top">' +
+            '<div><label>No. / Code</label><input data-field="code" type="text" inputmode="numeric" autocomplete="off" placeholder="1001" /></div>' +
+            '<div><label>Date</label><input data-field="date" type="date" /></div>' +
+            "</div>" +
+            '<div><label>Transaction description</label><input data-field="description" type="text" autocomplete="off" placeholder="Payee or memo" /></div>' +
+            '<div class="txn-money">' +
+            '<div><label>Payment / fee / withdrawal</label><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></div>' +
+            '<div><label>Deposit</label><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></div>' +
+            "</div>" +
+            '<div class="txn-actions">' +
+            '<span class="txn-balance" data-balance></span>' +
+            '<button type="button" class="btn-danger" data-remove>Remove</button>' +
+            "</div>";
+
+          card.querySelector('[data-field="code"]').value = txn.code;
+          card.querySelector('[data-field="date"]').value = txn.date;
+          card.querySelector('[data-field="description"]').value = txn.description;
+          card.querySelector('[data-field="payment"]').value = txn.payment ? String(txn.payment) : "";
+          card.querySelector('[data-field="deposit"]').value = txn.deposit ? String(txn.deposit) : "";
+          const balSpan = card.querySelector("[data-balance]");
+          balSpan.textContent = "Balance " + formatMoney(bal);
+          balSpan.classList.toggle("neg", bal < 0);
+
+          bindFields(card, txn, updateBalancesOnly);
+          card.querySelector("[data-remove]").addEventListener("click", function () {
+            removeTxn(txn.id);
+          });
+          listEl.appendChild(card);
+
+          const row = document.createElement("tr");
+          row.dataset.id = txn.id;
+          row.innerHTML =
+            '<td class="col-num"><input data-field="code" type="text" inputmode="numeric" autocomplete="off" placeholder="1001" /></td>' +
+            '<td class="col-date"><input data-field="date" type="date" /></td>' +
+            '<td class="col-desc"><input data-field="description" type="text" autocomplete="off" placeholder="Payee or memo" /></td>' +
+            '<td class="col-pay"><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></td>' +
+            '<td class="col-dep"><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></td>' +
+            '<td class="col-bal" data-balance></td>' +
+            '<td class="col-act"><button type="button" class="btn-danger" data-remove>Remove</button></td>';
+
+          row.querySelector('[data-field="code"]').value = txn.code;
+          row.querySelector('[data-field="date"]').value = txn.date;
+          row.querySelector('[data-field="description"]').value = txn.description;
+          row.querySelector('[data-field="payment"]').value = txn.payment ? String(txn.payment) : "";
+          row.querySelector('[data-field="deposit"]').value = txn.deposit ? String(txn.deposit) : "";
+          const balCell = row.querySelector("[data-balance]");
+          balCell.textContent = formatMoney(bal);
+          balCell.classList.toggle("neg", bal < 0);
+
+          bindFields(row, txn, updateBalancesOnly);
+          row.querySelector("[data-remove]").addEventListener("click", function () {
+            removeTxn(txn.id);
+          });
+          tbodyEl.appendChild(row);
+        });
+
+        updateRunningDisplay(bals);
+      }
+
+      function updateBalancesOnly() {
+        const bals = runningBalances();
+        listEl.querySelectorAll(".txn").forEach(function (card, index) {
+          const balSpan = card.querySelector("[data-balance]");
+          if (!balSpan) return;
+          balSpan.textContent = "Balance " + formatMoney(bals[index]);
+          balSpan.classList.toggle("neg", bals[index] < 0);
+        });
+        tbodyEl.querySelectorAll("tr[data-id]").forEach(function (row, index) {
+          const balCell = row.querySelector("[data-balance]");
+          if (!balCell) return;
+          balCell.textContent = formatMoney(bals[index]);
+          balCell.classList.toggle("neg", bals[index] < 0);
+        });
+        updateRunningDisplay(bals);
+      }
+
+      function removeTxn(id) {
+        state.txns = state.txns.filter(function (t) { return t.id !== id; });
+        persist(true);
+        render();
+        showToast("Entry removed");
+      }
+
+      beginningInput.addEventListener("input", function () {
+        state.beginning = parseMoney(beginningInput.value);
+        updateBalancesOnly();
+        schedulePersist();
+      });
+
+      document.getElementById("add-txn").addEventListener("click", function () {
+        const txn = {
+          id: uid(),
+          code: "",
+          date: todayISO(),
+          description: "",
+          payment: 0,
+          deposit: 0,
+        };
+        state.txns.push(txn);
+        persist(true);
+        render(txn.id);
+        const focusEl =
+          listEl.querySelector('[data-id="' + txn.id + '"] [data-field="code"]') ||
+          tbodyEl.querySelector('[data-id="' + txn.id + '"] [data-field="code"]');
+        if (focusEl) {
+          focusEl.focus();
+          focusEl.closest(".txn, tr").scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      });
+
+      document.getElementById("share-link").addEventListener("click", function () {
+        persist(true);
+        const url = location.href;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(
+            function () { showToast("Share link copied"); },
+            function () { window.prompt("Copy this share link:", url); }
+          );
+        } else {
+          window.prompt("Copy this share link:", url);
+        }
+      });
+
+      document.getElementById("clear-all").addEventListener("click", function () {
+        if (!confirm("Clear beginning balance and all entries?")) return;
+        state = { beginning: 0, txns: [] };
+        persist(true);
+        render();
+        showToast("Register cleared");
+      });
+
+      window.addEventListener("hashchange", function () {
+        if (!location.hash || location.hash.length <= 1) return;
+        const decoded = decodeState(location.hash);
+        if (!decoded) return;
+        state = decoded;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) { /* ignore */ }
+        render();
+      });
+
+      loadState();
+      render();
+      if (!location.hash || location.hash.length <= 1) {
+        persist(true);
+      }
+    })();
+  </script>
+</body>
+</html>
