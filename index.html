@@ -250,7 +250,7 @@
     table.register {
       width: 100%;
       border-collapse: collapse;
-      min-width: 720px;
+      min-width: 800px;
     }
 
     table.register th {
@@ -308,6 +308,117 @@
       color: var(--ink-soft);
       line-height: 1.4;
     }
+
+    .user-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.85rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 10px;
+      background: rgba(26, 58, 50, 0.06);
+      border: 1px solid rgba(183, 199, 189, 0.7);
+      font-size: 0.9rem;
+      color: var(--ink-soft);
+    }
+
+    .user-bar strong {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .btn-link {
+      background: transparent;
+      color: var(--accent-bright);
+      border: none;
+      border-radius: 0;
+      padding: 0.2rem 0;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .btn-link:hover { color: var(--accent); }
+
+    .txn-author {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+
+    .txn-author span {
+      color: var(--accent);
+    }
+
+    .col-by { width: 5.5rem; white-space: nowrap; }
+    .col-by .txn-author {
+      display: block;
+      padding: 0 0.25rem;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(20, 38, 31, 0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      width: min(380px, 100%);
+      background: #f7faf8;
+      border: 1px solid rgba(183, 199, 189, 0.95);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: 0 18px 40px rgba(20, 38, 31, 0.18);
+      transform: translateY(8px) scale(0.98);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-backdrop.open .modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal h2 {
+      margin: 0;
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: 1.55rem;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    .modal p {
+      margin: 0.45rem 0 1rem;
+      color: var(--ink-soft);
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .modal-actions .btn-primary { flex: 1; }
 
     .toast {
       position: fixed;
@@ -381,6 +492,11 @@
         </div>
       </div>
 
+      <div class="user-bar" id="user-bar" hidden>
+        <span>Entering as <strong id="user-display"></strong></span>
+        <button type="button" class="btn-link" id="change-user">Change name</button>
+      </div>
+
       <div class="toolbar">
         <button type="button" class="btn-primary" id="add-txn">Add entry</button>
         <button type="button" class="btn-ghost" id="share-link">Copy share link</button>
@@ -399,6 +515,7 @@
               <th class="col-pay">Payment / fee / withdrawal</th>
               <th class="col-dep">Deposit</th>
               <th class="col-bal">Balance</th>
+              <th class="col-by">By</th>
               <th class="col-act"></th>
             </tr>
           </thead>
@@ -407,9 +524,27 @@
       </div>
 
       <p class="hint">
-        Edits save in this browser and in the page URL hash—bookmark or send the link to keep your register with you.
+        Edits save in this browser and in the page URL hash—bookmark or send the link to keep your register with you. Each entry notes who added it.
       </p>
     </section>
+  </div>
+
+  <div id="user-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="user-modal-title" hidden>
+    <div class="modal">
+      <h2 id="user-modal-title">Who’s using the register?</h2>
+      <p>Enter your name or initials. New entries will show who added them.</p>
+      <label for="user-name-input">Name or initials</label>
+      <input
+        id="user-name-input"
+        type="text"
+        maxlength="24"
+        autocomplete="nickname"
+        placeholder="e.g. Alex or AJ"
+      />
+      <div class="modal-actions">
+        <button type="button" class="btn-primary" id="user-name-save">Continue</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -417,14 +552,20 @@
   <script>
     (function () {
       const STORAGE_KEY = "digital-register-v1";
+      const USER_KEY = "digital-register-user-v1";
       const beginningInput = document.getElementById("beginning-balance");
       const runningEl = document.getElementById("running-balance");
       const listEl = document.getElementById("txn-list");
       const tbodyEl = document.getElementById("txn-tbody");
       const toastEl = document.getElementById("toast");
+      const userBar = document.getElementById("user-bar");
+      const userDisplay = document.getElementById("user-display");
+      const userModal = document.getElementById("user-modal");
+      const userNameInput = document.getElementById("user-name-input");
       let toastTimer = null;
       let saveTimer = null;
       let state = { beginning: 0, txns: [] };
+      let currentUser = "";
 
       function uid() {
         return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -441,6 +582,93 @@
         if (value === "" || value === null || value === undefined) return 0;
         const n = Number(value);
         return Number.isFinite(n) ? n : 0;
+      }
+
+      function normalizeAuthor(value) {
+        return String(value || "").trim().slice(0, 24);
+      }
+
+      function normalizeTxn(t) {
+        return {
+          id: t.id || uid(),
+          code: String(t.code || ""),
+          date: String(t.date || todayISO()),
+          description: String(t.description || ""),
+          payment: parseMoney(t.payment),
+          deposit: parseMoney(t.deposit),
+          author: normalizeAuthor(t.author),
+        };
+      }
+
+      function loadUser() {
+        try {
+          currentUser = normalizeAuthor(localStorage.getItem(USER_KEY) || "");
+        } catch (e) {
+          currentUser = "";
+        }
+      }
+
+      function saveUser(name) {
+        currentUser = normalizeAuthor(name);
+        try {
+          if (currentUser) localStorage.setItem(USER_KEY, currentUser);
+          else localStorage.removeItem(USER_KEY);
+        } catch (e) { /* ignore */ }
+        updateUserBar();
+      }
+
+      function updateUserBar() {
+        if (currentUser) {
+          userDisplay.textContent = currentUser;
+          userBar.hidden = false;
+        } else {
+          userBar.hidden = true;
+        }
+      }
+
+      function openUserModal(options) {
+        const opts = options || {};
+        userNameInput.value = currentUser || "";
+        userModal.hidden = false;
+        requestAnimationFrame(function () {
+          userModal.classList.add("open");
+          userNameInput.focus();
+          userNameInput.select();
+        });
+        userModal.dataset.requireName = opts.requireName ? "1" : "0";
+      }
+
+      function closeUserModal() {
+        userModal.classList.remove("open");
+        setTimeout(function () {
+          if (!userModal.classList.contains("open")) userModal.hidden = true;
+        }, 200);
+      }
+
+      function ensureUser(thenFn) {
+        if (currentUser) {
+          if (thenFn) thenFn(currentUser);
+          return;
+        }
+        openUserModal({ requireName: true });
+        userModal.dataset.pendingAction = thenFn ? "1" : "0";
+        userModal._pendingThen = thenFn || null;
+      }
+
+      function commitUserFromModal() {
+        const name = normalizeAuthor(userNameInput.value);
+        if (!name) {
+          userNameInput.focus();
+          showToast("Enter a name or initials");
+          return;
+        }
+        saveUser(name);
+        closeUserModal();
+        const pending = userModal._pendingThen;
+        userModal._pendingThen = null;
+        userModal.dataset.pendingAction = "0";
+        if (pending) pending(currentUser);
+        else showToast("Signed in as " + currentUser);
       }
 
       function formatMoney(n) {
@@ -470,18 +698,7 @@
           if (typeof data !== "object" || data === null) return null;
           return {
             beginning: parseMoney(data.beginning),
-            txns: Array.isArray(data.txns)
-              ? data.txns.map(function (t) {
-                  return {
-                    id: t.id || uid(),
-                    code: String(t.code || ""),
-                    date: String(t.date || todayISO()),
-                    description: String(t.description || ""),
-                    payment: parseMoney(t.payment),
-                    deposit: parseMoney(t.deposit),
-                  };
-                })
-              : [],
+            txns: Array.isArray(data.txns) ? data.txns.map(normalizeTxn) : [],
           };
         } catch (e) {
           return null;
@@ -501,7 +718,7 @@
             const parsed = JSON.parse(raw);
             state = {
               beginning: parseMoney(parsed.beginning),
-              txns: Array.isArray(parsed.txns) ? parsed.txns : [],
+              txns: Array.isArray(parsed.txns) ? parsed.txns.map(normalizeTxn) : [],
             };
             return;
           }
@@ -588,7 +805,7 @@
 
           const emptyRow = document.createElement("tr");
           emptyRow.innerHTML =
-            '<td colspan="7" style="text-align:center;color:var(--ink-soft);padding:1.25rem;">No entries yet. Click Add entry to start.</td>';
+            '<td colspan="8" style="text-align:center;color:var(--ink-soft);padding:1.25rem;">No entries yet. Click Add entry to start.</td>';
           tbodyEl.appendChild(emptyRow);
           updateRunningDisplay(bals);
           return;
@@ -611,7 +828,10 @@
             '<div><label>Deposit</label><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></div>' +
             "</div>" +
             '<div class="txn-actions">' +
+            '<div>' +
             '<span class="txn-balance" data-balance></span>' +
+            '<div class="txn-author" data-author></div>' +
+            "</div>" +
             '<button type="button" class="btn-danger" data-remove>Remove</button>' +
             "</div>";
 
@@ -623,6 +843,11 @@
           const balSpan = card.querySelector("[data-balance]");
           balSpan.textContent = "Balance " + formatMoney(bal);
           balSpan.classList.toggle("neg", bal < 0);
+          const authorEl = card.querySelector("[data-author]");
+          authorEl.innerHTML = txn.author
+            ? 'By <span></span>'
+            : "By unknown";
+          if (txn.author) authorEl.querySelector("span").textContent = txn.author;
 
           bindFields(card, txn, updateBalancesOnly);
           card.querySelector("[data-remove]").addEventListener("click", function () {
@@ -639,6 +864,7 @@
             '<td class="col-pay"><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></td>' +
             '<td class="col-dep"><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></td>' +
             '<td class="col-bal" data-balance></td>' +
+            '<td class="col-by"><span class="txn-author" data-author></span></td>' +
             '<td class="col-act"><button type="button" class="btn-danger" data-remove>Remove</button></td>';
 
           row.querySelector('[data-field="code"]').value = txn.code;
@@ -649,6 +875,8 @@
           const balCell = row.querySelector("[data-balance]");
           balCell.textContent = formatMoney(bal);
           balCell.classList.toggle("neg", bal < 0);
+          const byEl = row.querySelector("[data-author]");
+          byEl.textContent = txn.author || "—";
 
           bindFields(row, txn, updateBalancesOnly);
           row.querySelector("[data-remove]").addEventListener("click", function () {
@@ -690,25 +918,49 @@
         schedulePersist();
       });
 
-      document.getElementById("add-txn").addEventListener("click", function () {
-        const txn = {
-          id: uid(),
-          code: "",
-          date: todayISO(),
-          description: "",
-          payment: 0,
-          deposit: 0,
-        };
-        state.txns.push(txn);
-        persist(true);
-        render(txn.id);
-        const focusEl =
-          listEl.querySelector('[data-id="' + txn.id + '"] [data-field="code"]') ||
-          tbodyEl.querySelector('[data-id="' + txn.id + '"] [data-field="code"]');
-        if (focusEl) {
-          focusEl.focus();
-          focusEl.closest(".txn, tr").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      function addTxn() {
+        ensureUser(function (author) {
+          const txn = {
+            id: uid(),
+            code: "",
+            date: todayISO(),
+            description: "",
+            payment: 0,
+            deposit: 0,
+            author: author,
+          };
+          state.txns.push(txn);
+          persist(true);
+          render(txn.id);
+          const focusEl =
+            listEl.querySelector('[data-id="' + txn.id + '"] [data-field="code"]') ||
+            tbodyEl.querySelector('[data-id="' + txn.id + '"] [data-field="code"]');
+          if (focusEl) {
+            focusEl.focus();
+            focusEl.closest(".txn, tr").scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        });
+      }
+
+      document.getElementById("add-txn").addEventListener("click", addTxn);
+
+      document.getElementById("change-user").addEventListener("click", function () {
+        openUserModal({ requireName: false });
+      });
+
+      document.getElementById("user-name-save").addEventListener("click", commitUserFromModal);
+
+      userNameInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commitUserFromModal();
         }
+      });
+
+      userModal.addEventListener("click", function (e) {
+        if (e.target !== userModal) return;
+        if (userModal.dataset.requireName === "1" && !currentUser) return;
+        closeUserModal();
       });
 
       document.getElementById("share-link").addEventListener("click", function () {
@@ -743,10 +995,15 @@
         render();
       });
 
+      loadUser();
+      updateUserBar();
       loadState();
       render();
       if (!location.hash || location.hash.length <= 1) {
         persist(true);
+      }
+      if (!currentUser) {
+        openUserModal({ requireName: true });
       }
     })();
   </script>
