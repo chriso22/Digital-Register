@@ -811,7 +811,9 @@
           return;
         }
 
-        state.txns.forEach(function (txn, index) {
+        // Newest entries first; balances still run oldest → newest in state.txns.
+        for (let index = state.txns.length - 1; index >= 0; index--) {
+          const txn = state.txns[index];
           const bal = bals[index];
 
           const card = document.createElement("article");
@@ -883,20 +885,23 @@
             removeTxn(txn.id);
           });
           tbodyEl.appendChild(row);
-        });
+        }
 
         updateRunningDisplay(bals);
       }
 
       function updateBalancesOnly() {
         const bals = runningBalances();
-        listEl.querySelectorAll(".txn").forEach(function (card, index) {
+        const n = state.txns.length;
+        listEl.querySelectorAll(".txn").forEach(function (card, displayIndex) {
+          const index = n - 1 - displayIndex;
           const balSpan = card.querySelector("[data-balance]");
           if (!balSpan) return;
           balSpan.textContent = "Balance " + formatMoney(bals[index]);
           balSpan.classList.toggle("neg", bals[index] < 0);
         });
-        tbodyEl.querySelectorAll("tr[data-id]").forEach(function (row, index) {
+        tbodyEl.querySelectorAll("tr[data-id]").forEach(function (row, displayIndex) {
+          const index = n - 1 - displayIndex;
           const balCell = row.querySelector("[data-balance]");
           if (!balCell) return;
           balCell.textContent = formatMoney(bals[index]);
