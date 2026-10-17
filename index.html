@@ -777,11 +777,58 @@
         }
       }
 
+      function parseCheckNumber(code) {
+        const s = String(code || "").trim();
+        if (!/^\d+$/.test(s)) return null;
+        const n = Number(s);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function nextCheckCode() {
+        let max = null;
+        state.txns.forEach(function (txn) {
+          const n = parseCheckNumber(txn.code);
+          if (n === null) return;
+          if (max === null || n > max) max = n;
+        });
+        return max === null ? "1001" : String(max + 1);
+      }
+
+      function isBlankDraft(txn) {
+        return (
+          !String(txn.description || "").trim() &&
+          !parseMoney(txn.payment) &&
+          !parseMoney(txn.deposit)
+        );
+      }
+
+      function focusNewEntry(txnId) {
+        // Code and date are already filled — land on the first empty input.
+        focusTxnField(txnId, "description");
+      }
+
+      function completeTxnAndAdvance() {
+        addTxn();
+      }
+
       function advanceFromField(el) {
         const field = el.getAttribute("data-field");
         const idx = FIELD_ORDER.indexOf(field);
         const root = el.closest(".txn, tr");
         if (!root || idx < 0) return;
+
+        // Amount fields finish the transaction: open a fresh empty entry.
+        if (field === "payment") {
+          if (parseMoney(el.value)) {
+            completeTxnAndAdvance();
+            return;
+          }
+        }
+        if (field === "deposit") {
+          completeTxnAndAdvance();
+          return;
+        }
+
         if (idx < FIELD_ORDER.length - 1) {
           const next = root.querySelector('[data-field="' + FIELD_ORDER[idx + 1] + '"]');
           if (next) {
@@ -790,9 +837,7 @@
               next.select();
             }
           }
-          return;
         }
-        addTxn();
       }
 
       function bindFields(root, txn, onMoneyChange) {
@@ -858,7 +903,7 @@
             "</div>" +
             '<div><label>Transaction description</label><input data-field="description" type="text" enterkeyhint="next" autocomplete="off" placeholder="Payee or memo" /></div>' +
             '<div class="txn-money">' +
-            '<div><label>Payment / fee / withdrawal</label><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="next" placeholder="0.00" /></div>' +
+            '<div><label>Payment / fee / withdrawal</label><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="done" placeholder="0.00" /></div>' +
             '<div><label>Deposit</label><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="done" placeholder="0.00" /></div>' +
             "</div>" +
             '<div class="txn-actions">' +
@@ -895,7 +940,7 @@
             '<td class="col-num"><input data-field="code" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="1001" /></td>' +
             '<td class="col-date"><input data-field="date" type="date" enterkeyhint="next" /></td>' +
             '<td class="col-desc"><input data-field="description" type="text" enterkeyhint="next" autocomplete="off" placeholder="Payee or memo" /></td>' +
-            '<td class="col-pay"><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="next" placeholder="0.00" /></td>' +
+            '<td class="col-pay"><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="done" placeholder="0.00" /></td>' +
             '<td class="col-dep"><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="done" placeholder="0.00" /></td>' +
             '<td class="col-bal" data-balance></td>' +
             '<td class="col-by"><span class="txn-author" data-author></span></td>' +
@@ -957,9 +1002,20 @@
 
       function addTxn() {
         ensureUser(function (author) {
+          const newest = state.txns.length ? state.txns[state.txns.length - 1] : null;
+          if (newest && isBlankDraft(newest)) {
+            if (!String(newest.code || "").trim()) {
+              newest.code = nextCheckCode();
+              persist(true);
+            }
+            render(newest.id);
+            focusNewEntry(newest.id);
+            return;
+          }
+
           const txn = {
             id: uid(),
-            code: "",
+            code: nextCheckCode(),
             date: todayISO(),
             description: "",
             payment: 0,
@@ -969,7 +1025,7 @@
           state.txns.push(txn);
           persist(true);
           render(txn.id);
-          focusTxnField(txn.id, "code");
+          focusNewEntry(txn.id);
         });
       }
 
