@@ -82,9 +82,9 @@
     .balance-block {
       display: grid;
       gap: 0.75rem;
-      margin-bottom: 1rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px dashed var(--line);
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px dashed var(--line);
     }
 
     @media (min-width: 640px) {
@@ -473,25 +473,6 @@
     </header>
 
     <section class="panel" aria-labelledby="balance-heading">
-      <div class="balance-block">
-        <div>
-          <label for="beginning-balance" id="balance-heading">Beginning balance</label>
-          <input
-            id="beginning-balance"
-            class="money"
-            type="number"
-            inputmode="decimal"
-            step="0.01"
-            placeholder="0.00"
-            autocomplete="off"
-          />
-        </div>
-        <div class="balance-summary">
-          <span class="balance-label">Current balance</span>
-          <span id="running-balance" class="balance-value">$0.00</span>
-        </div>
-      </div>
-
       <div class="user-bar" id="user-bar" hidden>
         <span>Entering as <strong id="user-display"></strong></span>
         <button type="button" class="btn-link" id="change-user">Change name</button>
@@ -521,6 +502,25 @@
           </thead>
           <tbody id="txn-tbody"></tbody>
         </table>
+      </div>
+
+      <div class="balance-block">
+        <div>
+          <label for="beginning-balance" id="balance-heading">Beginning balance</label>
+          <input
+            id="beginning-balance"
+            class="money"
+            type="number"
+            inputmode="decimal"
+            step="0.01"
+            placeholder="0.00"
+            autocomplete="off"
+          />
+        </div>
+        <div class="balance-summary">
+          <span class="balance-label">Current balance</span>
+          <span id="running-balance" class="balance-value">$0.00</span>
+        </div>
       </div>
 
       <p class="hint">
