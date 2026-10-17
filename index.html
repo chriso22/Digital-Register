@@ -756,6 +756,45 @@
         runningEl.classList.toggle("neg", finalBal < 0);
       }
 
+      var FIELD_ORDER = ["code", "date", "description", "payment", "deposit"];
+
+      function activeSurface() {
+        return window.matchMedia("(min-width: 780px)").matches ? tbodyEl : listEl;
+      }
+
+      function focusTxnField(txnId, field) {
+        const focusEl = activeSurface().querySelector(
+          '[data-id="' + txnId + '"] [data-field="' + field + '"]'
+        );
+        if (!focusEl) return;
+        focusEl.focus();
+        if (typeof focusEl.select === "function" && focusEl.type !== "date" && focusEl.type !== "number") {
+          focusEl.select();
+        }
+        const container = focusEl.closest(".txn, tr");
+        if (container) {
+          container.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
+
+      function advanceFromField(el) {
+        const field = el.getAttribute("data-field");
+        const idx = FIELD_ORDER.indexOf(field);
+        const root = el.closest(".txn, tr");
+        if (!root || idx < 0) return;
+        if (idx < FIELD_ORDER.length - 1) {
+          const next = root.querySelector('[data-field="' + FIELD_ORDER[idx + 1] + '"]');
+          if (next) {
+            next.focus();
+            if (typeof next.select === "function" && next.type !== "date" && next.type !== "number") {
+              next.select();
+            }
+          }
+          return;
+        }
+        addTxn();
+      }
+
       function bindFields(root, txn, onMoneyChange) {
         root.querySelectorAll("[data-field]").forEach(function (el) {
           function onField(e) {
@@ -772,6 +811,11 @@
           }
           el.addEventListener("input", onField);
           el.addEventListener("change", onField);
+          el.addEventListener("keydown", function (e) {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            advanceFromField(e.target);
+          });
         });
       }
 
@@ -809,13 +853,13 @@
           card.dataset.id = txn.id;
           card.innerHTML =
             '<div class="txn-top">' +
-            '<div><label>No. / Code</label><input data-field="code" type="text" inputmode="numeric" autocomplete="off" placeholder="1001" /></div>' +
-            '<div><label>Date</label><input data-field="date" type="date" /></div>' +
+            '<div><label>No. / Code</label><input data-field="code" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="1001" /></div>' +
+            '<div><label>Date</label><input data-field="date" type="date" enterkeyhint="next" /></div>' +
             "</div>" +
-            '<div><label>Transaction description</label><input data-field="description" type="text" autocomplete="off" placeholder="Payee or memo" /></div>' +
+            '<div><label>Transaction description</label><input data-field="description" type="text" enterkeyhint="next" autocomplete="off" placeholder="Payee or memo" /></div>' +
             '<div class="txn-money">' +
-            '<div><label>Payment / fee / withdrawal</label><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></div>' +
-            '<div><label>Deposit</label><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></div>' +
+            '<div><label>Payment / fee / withdrawal</label><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="next" placeholder="0.00" /></div>' +
+            '<div><label>Deposit</label><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="done" placeholder="0.00" /></div>' +
             "</div>" +
             '<div class="txn-actions">' +
             '<div>' +
@@ -848,11 +892,11 @@
           const row = document.createElement("tr");
           row.dataset.id = txn.id;
           row.innerHTML =
-            '<td class="col-num"><input data-field="code" type="text" inputmode="numeric" autocomplete="off" placeholder="1001" /></td>' +
-            '<td class="col-date"><input data-field="date" type="date" /></td>' +
-            '<td class="col-desc"><input data-field="description" type="text" autocomplete="off" placeholder="Payee or memo" /></td>' +
-            '<td class="col-pay"><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></td>' +
-            '<td class="col-dep"><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" placeholder="0.00" /></td>' +
+            '<td class="col-num"><input data-field="code" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="1001" /></td>' +
+            '<td class="col-date"><input data-field="date" type="date" enterkeyhint="next" /></td>' +
+            '<td class="col-desc"><input data-field="description" type="text" enterkeyhint="next" autocomplete="off" placeholder="Payee or memo" /></td>' +
+            '<td class="col-pay"><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="next" placeholder="0.00" /></td>' +
+            '<td class="col-dep"><input data-field="deposit" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="done" placeholder="0.00" /></td>' +
             '<td class="col-bal" data-balance></td>' +
             '<td class="col-by"><span class="txn-author" data-author></span></td>' +
             '<td class="col-act"><button type="button" class="btn-danger" data-remove>Remove</button></td>';
@@ -925,13 +969,7 @@
           state.txns.push(txn);
           persist(true);
           render(txn.id);
-          const focusEl =
-            listEl.querySelector('[data-id="' + txn.id + '"] [data-field="code"]') ||
-            tbodyEl.querySelector('[data-id="' + txn.id + '"] [data-field="code"]');
-          if (focusEl) {
-            focusEl.focus();
-            focusEl.closest(".txn, tr").scrollIntoView({ behavior: "smooth", block: "nearest" });
-          }
+          focusTxnField(txn.id, "code");
         });
       }
 
