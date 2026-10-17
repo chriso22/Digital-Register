@@ -79,19 +79,16 @@
       animation: rise 0.6s ease-out 0.08s both;
     }
 
-    .balance-block {
-      display: grid;
-      gap: 0.75rem;
+    .balance-summary {
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .beginning-block {
       margin-top: 1rem;
       padding-top: 1rem;
       border-top: 1px dashed var(--line);
-    }
-
-    @media (min-width: 640px) {
-      .balance-block {
-        grid-template-columns: 1fr auto;
-        align-items: end;
-      }
     }
 
     label {
@@ -128,14 +125,6 @@
     .col-balance {
       font-family: "IBM Plex Mono", ui-monospace, monospace;
       font-variant-numeric: tabular-nums;
-    }
-
-    .balance-summary {
-      text-align: left;
-    }
-
-    @media (min-width: 640px) {
-      .balance-summary { text-align: right; }
     }
 
     .balance-label {
@@ -472,7 +461,12 @@
       <p class="tagline">A pocket checkbook with a running balance—saved on your phone and shareable by link.</p>
     </header>
 
-    <section class="panel" aria-labelledby="balance-heading">
+    <section class="panel" aria-labelledby="current-balance-heading">
+      <div class="balance-summary">
+        <span class="balance-label" id="current-balance-heading">Current balance</span>
+        <span id="running-balance" class="balance-value">$0.00</span>
+      </div>
+
       <div class="user-bar" id="user-bar" hidden>
         <span>Entering as <strong id="user-display"></strong></span>
         <button type="button" class="btn-link" id="change-user">Change name</button>
@@ -504,23 +498,17 @@
         </table>
       </div>
 
-      <div class="balance-block">
-        <div>
-          <label for="beginning-balance" id="balance-heading">Beginning balance</label>
-          <input
-            id="beginning-balance"
-            class="money"
-            type="number"
-            inputmode="decimal"
-            step="0.01"
-            placeholder="0.00"
-            autocomplete="off"
-          />
-        </div>
-        <div class="balance-summary">
-          <span class="balance-label">Current balance</span>
-          <span id="running-balance" class="balance-value">$0.00</span>
-        </div>
+      <div class="beginning-block">
+        <label for="beginning-balance" id="balance-heading">Beginning balance</label>
+        <input
+          id="beginning-balance"
+          class="money"
+          type="number"
+          inputmode="decimal"
+          step="0.01"
+          placeholder="0.00"
+          autocomplete="off"
+        />
       </div>
 
       <p class="hint">
