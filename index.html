@@ -512,7 +512,7 @@
       </div>
 
       <p class="hint">
-        Edits save in this browser and in the page URL hash—bookmark or send the link to keep your register with you. Each entry notes who added it.
+        Edits save in this browser and in the page URL hash. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it.
       </p>
     </section>
   </div>
@@ -552,11 +552,57 @@
       const userNameInput = document.getElementById("user-name-input");
       let toastTimer = null;
       let saveTimer = null;
-      let state = { beginning: 0, txns: [] };
+      let state = { beginning: 0, txns: [], updatedAt: 0 };
       let currentUser = "";
+      let applyingHash = false;
 
       function uid() {
         return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      }
+
+      function emptyState() {
+        return { beginning: 0, txns: [], updatedAt: 0 };
+      }
+
+      function isEmptyState(data) {
+        if (!data) return true;
+        return !parseMoney(data.beginning) && !(data.txns && data.txns.length);
+      }
+
+      function stateRichness(data) {
+        if (!data) return 0;
+        const txns = Array.isArray(data.txns) ? data.txns.length : 0;
+        return txns * 1000 + (parseMoney(data.beginning) ? 1 : 0);
+      }
+
+      function normalizeState(data) {
+        if (!data || typeof data !== "object") return null;
+        return {
+          beginning: parseMoney(data.beginning),
+          txns: Array.isArray(data.txns) ? data.txns.map(normalizeTxn) : [],
+          updatedAt: Number(data.updatedAt) || 0,
+        };
+      }
+
+      // Prefer the non-empty / newer copy so a blank or stale URL hash cannot wipe
+      // a fuller register already saved in localStorage (common on iPhone re-opens).
+      function chooseState(fromHash, fromLocal) {
+        if (!fromHash && !fromLocal) return emptyState();
+        if (!fromHash) return fromLocal;
+        if (!fromLocal) return fromHash;
+
+        const hashEmpty = isEmptyState(fromHash);
+        const localEmpty = isEmptyState(fromLocal);
+        if (hashEmpty && !localEmpty) return fromLocal;
+        if (localEmpty && !hashEmpty) return fromHash;
+        if (hashEmpty && localEmpty) return fromLocal;
+
+        const hTime = fromHash.updatedAt || 0;
+        const lTime = fromLocal.updatedAt || 0;
+        if (hTime || lTime) {
+          return hTime >= lTime ? fromHash : fromLocal;
+        }
+        return stateRichness(fromLocal) > stateRichness(fromHash) ? fromLocal : fromHash;
       }
 
       function todayISO() {
@@ -683,47 +729,52 @@
           const binary = atob(b64);
           const bytes = Uint8Array.from(binary, function (c) { return c.charCodeAt(0); });
           const data = JSON.parse(new TextDecoder().decode(bytes));
-          if (typeof data !== "object" || data === null) return null;
-          return {
-            beginning: parseMoney(data.beginning),
-            txns: Array.isArray(data.txns) ? data.txns.map(normalizeTxn) : [],
-          };
+          return normalizeState(data);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function readLocalState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return null;
+          return normalizeState(JSON.parse(raw));
         } catch (e) {
           return null;
         }
       }
 
       function loadState() {
-        const fromHash = location.hash && location.hash.length > 1 ? decodeState(location.hash) : null;
-        if (fromHash) {
-          state = fromHash;
-          persist(false);
-          return;
-        }
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            state = {
-              beginning: parseMoney(parsed.beginning),
-              txns: Array.isArray(parsed.txns) ? parsed.txns.map(normalizeTxn) : [],
-            };
-            return;
-          }
-        } catch (e) { /* ignore */ }
-        state = { beginning: 0, txns: [] };
+        const fromHash =
+          location.hash && location.hash.length > 1 ? decodeState(location.hash) : null;
+        const fromLocal = readLocalState();
+        state = chooseState(fromHash, fromLocal);
+        // Keep hash and localStorage aligned with the chosen copy.
+        persist(true);
       }
 
       function persist(updateHash) {
+        state.updatedAt = Date.now();
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         } catch (e) { /* ignore */ }
         if (updateHash !== false) {
-          const encoded = encodeState(state);
-          if (history.replaceState) {
-            history.replaceState(null, "", "#" + encoded);
-          } else {
-            location.hash = encoded;
+          const encoded = encodeState({
+            beginning: state.beginning,
+            txns: state.txns,
+            updatedAt: state.updatedAt,
+          });
+          applyingHash = true;
+          try {
+            if (history.replaceState) {
+              history.replaceState(null, "", "#" + encoded);
+            } else {
+              location.hash = encoded;
+            }
+          } finally {
+            // location.hash assignment is sync; replaceState does not fire hashchange.
+            setTimeout(function () { applyingHash = false; }, 0);
           }
         }
       }
@@ -731,6 +782,15 @@
       function schedulePersist() {
         clearTimeout(saveTimer);
         saveTimer = setTimeout(function () { persist(true); }, 120);
+      }
+
+      function flushPersist() {
+        // Only flush a pending debounced save. Always rewriting on hide/unload
+        // would let an idle/empty tab overwrite fresher data from another tab.
+        if (!saveTimer) return;
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        persist(true);
       }
 
       function showToast(message) {
@@ -1065,30 +1125,49 @@
 
       document.getElementById("clear-all").addEventListener("click", function () {
         if (!confirm("Clear beginning balance and all entries?")) return;
-        state = { beginning: 0, txns: [] };
+        state = emptyState();
         persist(true);
         render();
         showToast("Register cleared");
       });
 
       window.addEventListener("hashchange", function () {
-        if (!location.hash || location.hash.length <= 1) return;
+        if (applyingHash) return;
+        if (!location.hash || location.hash.length <= 1) {
+          // Hash was stripped — restore it from the in-memory / local register.
+          persist(true);
+          return;
+        }
         const decoded = decodeState(location.hash);
         if (!decoded) return;
-        state = decoded;
+        const chosen = chooseState(decoded, state);
+        if (chosen === state && isEmptyState(decoded) && !isEmptyState(state)) {
+          // Ignore a blank hash that would wipe a fuller working register.
+          persist(true);
+          return;
+        }
+        state = chosen;
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         } catch (e) { /* ignore */ }
+        if (chosen !== decoded) persist(true);
         render();
       });
+
+      window.addEventListener("pagehide", flushPersist);
+      window.addEventListener("beforeunload", flushPersist);
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") flushPersist();
+      });
+
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().catch(function () { /* ignore */ });
+      }
 
       loadUser();
       updateUserBar();
       loadState();
       render();
-      if (!location.hash || location.hash.length <= 1) {
-        persist(true);
-      }
       if (!currentUser) {
         openUserModal({ requireName: true });
       }
