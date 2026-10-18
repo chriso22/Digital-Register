@@ -219,7 +219,6 @@
       min-width: 0;
       max-width: 100%;
       width: 100%;
-      overflow: hidden;
     }
 
     .txn input {
@@ -230,13 +229,16 @@
       box-sizing: border-box;
     }
 
+    /* Date inputs have a large intrinsic min-width; keep the full border
+       visible and aligned with the deposit field in the row below. */
     .txn input[type="date"] {
       min-width: 0;
       width: 100%;
       max-width: 100%;
       font-size: 0.92rem;
       padding-left: 0.55rem;
-      padding-right: 0.4rem;
+      padding-right: 0.35rem;
+      overflow: hidden;
     }
 
     .txn input[type="date"]::-webkit-date-and-time-value {
@@ -248,13 +250,15 @@
       min-width: 0;
       max-width: 100%;
       padding: 0;
+      overflow: hidden;
     }
 
     .txn input[type="date"]::-webkit-calendar-picker-indicator {
-      margin: 0;
+      margin: 0 0 0 0.15rem;
       padding: 0;
-      width: 1rem;
-      height: 1rem;
+      width: 0.95rem;
+      height: 0.95rem;
+      flex-shrink: 0;
     }
 
     .txn-actions {
@@ -286,7 +290,7 @@
     .history-head,
     .history-row {
       display: grid;
-      grid-template-columns: 3.4rem minmax(0, 1fr) 3.5rem 3.5rem 1.6rem;
+      grid-template-columns: 3.4rem minmax(0, 1fr) 4.25rem 4.25rem 1.6rem;
       gap: 0.3rem;
       align-items: center;
       padding: 0.45rem 0.55rem;
@@ -302,6 +306,11 @@
       background: rgba(238, 243, 239, 0.85);
       border-bottom: 1px solid var(--line);
       font-size: 0.62rem;
+    }
+
+    .history-head .h-pay,
+    .history-head .h-dep {
+      text-align: right;
     }
 
     .history-row {
@@ -330,7 +339,10 @@
       font-family: "IBM Plex Mono", ui-monospace, monospace;
       font-variant-numeric: tabular-nums;
       text-align: right;
+      justify-self: stretch;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .history-row .h-pay {
@@ -339,7 +351,7 @@
     }
 
     .history-row .h-dep {
-      color: var(--accent);
+      color: var(--ink);
       font-weight: 500;
     }
 
@@ -605,7 +617,6 @@
       </div>
 
       <div class="toolbar">
-        <button type="button" class="btn-primary" id="add-txn">Add entry</button>
         <button type="button" class="btn-ghost" id="share-link">Copy share link</button>
         <button type="button" class="btn-danger" id="clear-all">Clear</button>
       </div>
@@ -834,7 +845,10 @@
         userModal._pendingThen = null;
         userModal.dataset.pendingAction = "0";
         if (pending) pending(currentUser);
-        else showToast("Signed in as " + currentUser);
+        else {
+          render();
+          showToast("Signed in as " + currentUser);
+        }
       }
 
       function formatMoney(n) {
@@ -859,13 +873,13 @@
 
       function formatPaymentDisplay(n) {
         const amount = parseMoney(n);
-        if (!amount) return "—";
-        return formatMoney(-Math.abs(amount));
+        if (!amount) return "";
+        return formatMoney(Math.abs(amount));
       }
 
       function formatDepositDisplay(n) {
         const amount = parseMoney(n);
-        if (!amount) return "—";
+        if (!amount) return "";
         return formatMoney(amount);
       }
 
@@ -1038,7 +1052,7 @@
 
       function completeTxnAndAdvance() {
         // Promote the current form entry into the compact history list by
-        // opening a fresh blank draft (Add entry / Enter share this path).
+        // opening a fresh blank draft (Enter shares this path).
         addTxn();
       }
 
@@ -1224,7 +1238,28 @@
         return row;
       }
 
+      function ensureCurrentEntry() {
+        // Without a toolbar "Add entry" button, keep a blank draft available
+        // so the Enter / field form is always the way to add transactions.
+        if (!currentUser) return;
+        if (resolveEditingId()) return;
+        const txn = {
+          id: uid(),
+          code: nextCheckCode(),
+          date: todayISO(),
+          description: "",
+          payment: 0,
+          deposit: 0,
+          author: currentUser,
+        };
+        state.txns.push(txn);
+        editingId = txn.id;
+        persist(true);
+      }
+
       function render(animateId) {
+        ensureCurrentEntry();
+
         beginningInput.value =
           state.beginning === 0 || state.beginning === ""
             ? ""
@@ -1237,12 +1272,12 @@
         if (!state.txns.length) {
           const empty = document.createElement("div");
           empty.className = "empty";
-          empty.textContent = "No entries yet. Tap Add entry to start your register.";
+          empty.textContent = "No entries yet. Enter a name to start your register.";
           listEl.appendChild(empty);
 
           const emptyRow = document.createElement("tr");
           emptyRow.innerHTML =
-            '<td colspan="7" style="text-align:center;color:var(--ink-soft);padding:1.25rem;">No entries yet. Click Add entry to start.</td>';
+            '<td colspan="7" style="text-align:center;color:var(--ink-soft);padding:1.25rem;">No entries yet. Enter a name to start.</td>';
           tbodyEl.appendChild(emptyRow);
           updateRunningDisplay(bals);
           return;
@@ -1256,17 +1291,19 @@
         const head = document.createElement("div");
         head.className = "history-head";
         head.innerHTML =
-          "<span>Date</span><span>Description</span><span style=\"text-align:right\">Payment</span><span style=\"text-align:right\">Deposit</span><span></span>";
+          '<span>Date</span><span>Description</span><span class="h-pay">Payment</span><span class="h-dep">Deposit</span><span></span>';
         history.appendChild(head);
 
         let historyCount = 0;
+        let formCard = null;
 
         // Newest entries first; balances still run oldest → newest in state.txns.
+        // History sits above the current entry form on mobile.
         for (let index = state.txns.length - 1; index >= 0; index--) {
           const txn = state.txns[index];
 
           if (txn.id === formId) {
-            listEl.appendChild(buildTxnCard(txn, animateId));
+            formCard = buildTxnCard(txn, animateId);
           } else if (!isBlankDraft(txn)) {
             history.appendChild(buildHistoryRow(txn));
             historyCount += 1;
@@ -1278,11 +1315,14 @@
         if (historyCount) {
           listEl.appendChild(history);
         }
+        if (formCard) {
+          listEl.appendChild(formCard);
+        }
 
         if (!formId && !historyCount) {
           const empty = document.createElement("div");
           empty.className = "empty";
-          empty.textContent = "No entries yet. Tap Add entry to start your register.";
+          empty.textContent = "No entries yet. Enter a name to start your register.";
           listEl.appendChild(empty);
         }
 
@@ -1337,8 +1377,6 @@
           focusNewEntry(txn.id);
         });
       }
-
-      document.getElementById("add-txn").addEventListener("click", addTxn);
 
       document.getElementById("change-user").addEventListener("click", function () {
         openUserModal({ requireName: false });
