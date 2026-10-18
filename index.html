@@ -241,7 +241,9 @@
       width: 100%;
       max-width: 100%;
       height: 2.85rem;
-      font-size: 1rem;
+      min-height: 2.85rem;
+      max-height: 2.85rem;
+      font-size: 1rem; /* >=16px avoids iOS focus zoom skewing layout */
       letter-spacing: -0.01em;
       padding-left: 0.75rem;
       padding-right: 0.75rem;
@@ -281,6 +283,17 @@
       height: 1rem;
       flex-shrink: 0;
       opacity: 0.55;
+    }
+
+    /* Phones: whole field opens the picker; hide the extra icon chrome. */
+    @media (hover: none) and (pointer: coarse) {
+      .txn input[type="date"] {
+        padding-right: 0.75rem;
+      }
+
+      .txn input[type="date"]::-webkit-calendar-picker-indicator {
+        display: none;
+      }
     }
 
     .txn-actions {
