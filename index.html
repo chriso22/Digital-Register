@@ -1454,12 +1454,14 @@
       });
 
       function backupPayload() {
+        // Omit the in-progress blank draft; restore will create a fresh one.
+        const txns = state.txns.filter(function (t) { return !isBlankDraft(t); });
         return {
           app: "digital-register",
           version: 1,
           exportedAt: new Date().toISOString(),
           beginning: state.beginning,
-          txns: state.txns,
+          txns: txns,
           updatedAt: state.updatedAt || Date.now(),
         };
       }
@@ -1511,7 +1513,7 @@
         editingId = null;
         persist(true);
         render();
-        const count = state.txns.length;
+        const count = state.txns.filter(function (t) { return !isBlankDraft(t); }).length;
         showToast(
           count
             ? "Restored " + count + " entr" + (count === 1 ? "y" : "ies")
@@ -1541,7 +1543,11 @@
             showToast("Invalid backup file");
             return;
           }
-          if (!isEmptyState(state)) {
+          // A blank in-progress draft alone is not real data worth confirming over.
+          const hasSavedData =
+            parseMoney(state.beginning) ||
+            state.txns.some(function (t) { return !isBlankDraft(t); });
+          if (hasSavedData) {
             if (!confirm("Replace the current register with this backup?")) return;
           }
           applyRestoredState(restored);
