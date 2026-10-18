@@ -653,7 +653,15 @@
 
       <div class="toolbar">
         <button type="button" class="btn-ghost" id="share-link">Copy share link</button>
+        <button type="button" class="btn-ghost" id="download-backup">Download backup</button>
+        <button type="button" class="btn-ghost" id="restore-backup">Restore backup</button>
         <button type="button" class="btn-danger" id="clear-all">Clear</button>
+        <input
+          type="file"
+          id="backup-file"
+          accept="application/json,.json"
+          hidden
+        />
       </div>
 
       <div id="txn-list" class="list" aria-live="polite"></div>
@@ -689,7 +697,7 @@
       </div>
 
       <p class="hint">
-        Edits save in this browser and in the page URL hash. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it.
+        Edits save in this browser and in the page URL hash. Download a backup JSON file so you can restore later if this browser clears storage. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it.
       </p>
     </section>
   </div>
@@ -1443,6 +1451,108 @@
         } else {
           window.prompt("Copy this share link:", url);
         }
+      });
+
+      function backupPayload() {
+        // Omit the in-progress blank draft; restore will create a fresh one.
+        const txns = state.txns.filter(function (t) { return !isBlankDraft(t); });
+        return {
+          app: "digital-register",
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          beginning: state.beginning,
+          txns: txns,
+          updatedAt: state.updatedAt || Date.now(),
+        };
+      }
+
+      function backupFilename() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return "digital-register-backup-" + y + "-" + m + "-" + day + ".json";
+      }
+
+      function parseBackupFile(text) {
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          return null;
+        }
+        if (!data || typeof data !== "object") return null;
+        // Accept wrapped backups and raw state objects from older saves.
+        const candidate =
+          data.app === "digital-register" || "beginning" in data || "txns" in data
+            ? data
+            : null;
+        if (!candidate) return null;
+        return normalizeState(candidate);
+      }
+
+      function downloadBackup() {
+        flushPersist();
+        persist(true);
+        const json = JSON.stringify(backupPayload(), null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = backupFilename();
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        showToast("Backup downloaded");
+      }
+
+      function applyRestoredState(restored) {
+        state = restored;
+        editingId = null;
+        persist(true);
+        render();
+        const count = state.txns.filter(function (t) { return !isBlankDraft(t); }).length;
+        showToast(
+          count
+            ? "Restored " + count + " entr" + (count === 1 ? "y" : "ies")
+            : "Backup restored"
+        );
+      }
+
+      document.getElementById("download-backup").addEventListener("click", downloadBackup);
+
+      document.getElementById("restore-backup").addEventListener("click", function () {
+        document.getElementById("backup-file").click();
+      });
+
+      document.getElementById("backup-file").addEventListener("change", function (e) {
+        const input = e.target;
+        const file = input.files && input.files[0];
+        input.value = "";
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onerror = function () {
+          showToast("Could not read backup file");
+        };
+        reader.onload = function () {
+          const restored = parseBackupFile(String(reader.result || ""));
+          if (!restored) {
+            showToast("Invalid backup file");
+            return;
+          }
+          // A blank in-progress draft alone is not real data worth confirming over.
+          const hasSavedData =
+            parseMoney(state.beginning) ||
+            state.txns.some(function (t) { return !isBlankDraft(t); });
+          if (hasSavedData) {
+            if (!confirm("Replace the current register with this backup?")) return;
+          }
+          applyRestoredState(restored);
+        };
+        reader.readAsText(file);
       });
 
       document.getElementById("clear-all").addEventListener("click", function () {
