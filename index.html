@@ -201,7 +201,6 @@
 
     .txn.entering { animation: slideIn 0.35s ease-out both; }
 
-    .txn-top,
     .txn-money {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -210,9 +209,24 @@
       width: 100%;
     }
 
-    /* Match payment/deposit columns so the stacked field edges line up. */
+    /* Code left, date right-justified so its trailing edge matches Deposit. */
     .txn-top {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 0.55rem;
+      width: 100%;
+    }
+
+    .txn-top .txn-field {
+      flex: 0 1 auto;
+      width: min(8.75rem, calc(46% - 0.3rem));
+      max-width: calc(48% - 0.3rem);
+    }
+
+    .txn-top .txn-field:last-child {
+      width: min(9.25rem, calc(46% - 0.3rem));
+      margin-left: auto;
     }
 
     .txn-field {
@@ -229,35 +243,38 @@
       box-sizing: border-box;
     }
 
-    /* Date inputs have a large intrinsic min-width; keep the full border
-       visible and aligned with the deposit field in the row below. */
+    /* Native date controls fight width constraints; pin them to the field. */
     .txn input[type="date"] {
       min-width: 0;
       width: 100%;
       max-width: 100%;
-      font-size: 0.92rem;
-      padding-left: 0.55rem;
-      padding-right: 0.35rem;
-      overflow: hidden;
+      font-size: 0.88rem;
+      letter-spacing: -0.01em;
+      padding-left: 0.5rem;
+      padding-right: 0.3rem;
     }
 
     .txn input[type="date"]::-webkit-date-and-time-value {
       text-align: left;
       margin: 0;
+      min-width: 0;
     }
 
     .txn input[type="date"]::-webkit-datetime-edit {
       min-width: 0;
       max-width: 100%;
       padding: 0;
-      overflow: hidden;
+    }
+
+    .txn input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+      min-width: 0;
     }
 
     .txn input[type="date"]::-webkit-calendar-picker-indicator {
-      margin: 0 0 0 0.15rem;
+      margin: 0 0 0 0.1rem;
       padding: 0;
-      width: 0.95rem;
-      height: 0.95rem;
+      width: 0.9rem;
+      height: 0.9rem;
       flex-shrink: 0;
     }
 
@@ -1298,7 +1315,7 @@
         let formCard = null;
 
         // Newest entries first; balances still run oldest → newest in state.txns.
-        // History sits above the current entry form on mobile.
+        // Entry form sits above history (between toolbar and saved rows).
         for (let index = state.txns.length - 1; index >= 0; index--) {
           const txn = state.txns[index];
 
@@ -1312,11 +1329,11 @@
           tbodyEl.appendChild(buildDesktopRow(txn));
         }
 
-        if (historyCount) {
-          listEl.appendChild(history);
-        }
         if (formCard) {
           listEl.appendChild(formCard);
+        }
+        if (historyCount) {
+          listEl.appendChild(history);
         }
 
         if (!formId && !historyCount) {
