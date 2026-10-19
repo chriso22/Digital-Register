@@ -584,9 +584,128 @@
       display: flex;
       gap: 0.5rem;
       margin-top: 1rem;
+      flex-wrap: wrap;
     }
 
     .modal-actions .btn-primary { flex: 1; }
+    .modal-actions .btn-ghost { flex: 1; }
+
+    .modal label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--ink-soft);
+      margin: 0.65rem 0 0.35rem;
+    }
+
+    .modal label:first-of-type { margin-top: 0; }
+
+    .modal input[type="password"],
+    .modal input[type="text"],
+    .modal input[type="tel"] {
+      width: 100%;
+      font: inherit;
+      font-size: 1.05rem;
+      letter-spacing: 0.08em;
+      padding: 0.7rem 0.8rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .modal .field-error {
+      margin: 0.45rem 0 0;
+      min-height: 1.2em;
+      font-size: 0.85rem;
+      color: var(--danger);
+    }
+
+    .modal .modal-note {
+      margin: 0.55rem 0 0;
+      font-size: 0.8rem;
+      color: var(--ink-soft);
+      line-height: 1.35;
+    }
+
+    .lock-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+      background:
+        radial-gradient(120% 80% at 10% -10%, rgba(45, 106, 90, 0.22), transparent 55%),
+        linear-gradient(180deg, #1a3a32 0%, #14261f 100%);
+      color: #eef3ef;
+    }
+
+    .lock-screen[hidden] { display: none; }
+
+    .lock-card {
+      width: min(360px, 100%);
+      text-align: center;
+    }
+
+    .lock-card .brand {
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: clamp(2rem, 8vw, 2.6rem);
+      color: #f4faf7;
+      margin: 0 0 0.35rem;
+    }
+
+    .lock-card p {
+      margin: 0 0 1.1rem;
+      color: rgba(238, 243, 239, 0.78);
+      font-size: 0.95rem;
+    }
+
+    .lock-card label {
+      display: block;
+      text-align: left;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: rgba(238, 243, 239, 0.7);
+    }
+
+    .lock-card input {
+      width: 100%;
+      font: inherit;
+      font-size: 1.35rem;
+      letter-spacing: 0.35em;
+      text-align: center;
+      padding: 0.85rem 0.75rem;
+      border: 1px solid rgba(183, 199, 189, 0.45);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #f4faf7;
+      margin-bottom: 0.75rem;
+    }
+
+    .lock-card input::placeholder { letter-spacing: 0.12em; color: rgba(244, 250, 247, 0.35); }
+
+    .lock-card .btn-primary {
+      width: 100%;
+      background: #f4faf7;
+      color: var(--accent);
+    }
+
+    .lock-card .btn-primary:hover { background: #fff; }
+
+    .lock-error {
+      min-height: 1.2em;
+      margin: 0 0 0.65rem;
+      font-size: 0.88rem;
+      color: #f0b4a8;
+    }
+
+    .app.locked {
+      visibility: hidden;
+      pointer-events: none;
+    }
 
     .toast {
       position: fixed;
@@ -649,12 +768,14 @@
       <div class="user-bar" id="user-bar" hidden>
         <span>Entering as <strong id="user-display"></strong></span>
         <button type="button" class="btn-link" id="change-user">Change name</button>
+        <button type="button" class="btn-link" id="pin-settings">Set PIN</button>
       </div>
 
       <div class="toolbar">
         <button type="button" class="btn-ghost" id="share-link">Copy share link</button>
         <button type="button" class="btn-ghost" id="download-backup">Download backup</button>
         <button type="button" class="btn-ghost" id="restore-backup">Restore backup</button>
+        <button type="button" class="btn-ghost" id="lock-now" hidden>Lock now</button>
         <button type="button" class="btn-danger" id="clear-all">Clear</button>
         <input
           type="file"
@@ -697,9 +818,27 @@
       </div>
 
       <p class="hint">
-        Edits save in this browser and in the page URL hash. Download a backup JSON file so you can restore later if this browser clears storage. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it.
+        Edits save in this browser and in the page URL hash. Backups are password-encrypted on your device before download. An optional PIN can lock the screen on this phone—it is a local barrier, not server-side security. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it.
       </p>
     </section>
+  </div>
+
+  <div id="lock-screen" class="lock-screen" hidden>
+    <div class="lock-card">
+      <h1 class="brand">Digital Register</h1>
+      <p>Enter your PIN to open the register.</p>
+      <label for="lock-pin-input">PIN</label>
+      <input
+        id="lock-pin-input"
+        type="password"
+        inputmode="numeric"
+        autocomplete="current-password"
+        maxlength="8"
+        placeholder="••••"
+      />
+      <p class="lock-error" id="lock-error" aria-live="polite"></p>
+      <button type="button" class="btn-primary" id="lock-unlock">Unlock</button>
+    </div>
   </div>
 
   <div id="user-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="user-modal-title" hidden>
@@ -720,12 +859,43 @@
     </div>
   </div>
 
+  <div id="secret-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="secret-modal-title" hidden>
+    <div class="modal">
+      <h2 id="secret-modal-title">Password</h2>
+      <p id="secret-modal-message"></p>
+      <div id="secret-field-current-wrap" hidden>
+        <label for="secret-current" id="secret-current-label">Current PIN</label>
+        <input id="secret-current" type="password" autocomplete="current-password" />
+      </div>
+      <div id="secret-field-main-wrap">
+        <label for="secret-main" id="secret-main-label">Password</label>
+        <input id="secret-main" type="password" autocomplete="new-password" />
+      </div>
+      <div id="secret-field-confirm-wrap" hidden>
+        <label for="secret-confirm" id="secret-confirm-label">Confirm</label>
+        <input id="secret-confirm" type="password" autocomplete="new-password" />
+      </div>
+      <p class="field-error" id="secret-error" aria-live="polite"></p>
+      <p class="modal-note" id="secret-note" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="secret-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="secret-submit">Continue</button>
+      </div>
+      <div class="modal-actions" id="secret-extra-actions" hidden>
+        <button type="button" class="btn-danger" id="secret-remove-pin">Remove PIN</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
     (function () {
       const STORAGE_KEY = "digital-register-v1";
       const USER_KEY = "digital-register-user-v1";
+      const PIN_KEY = "digital-register-pin-v1";
+      const UNLOCK_SESSION_KEY = "digital-register-unlocked-v1";
+      const PBKDF2_ITERATIONS = 310000;
       const beginningInput = document.getElementById("beginning-balance");
       const runningEl = document.getElementById("running-balance");
       const listEl = document.getElementById("txn-list");
@@ -735,12 +905,36 @@
       const userDisplay = document.getElementById("user-display");
       const userModal = document.getElementById("user-modal");
       const userNameInput = document.getElementById("user-name-input");
+      const lockScreen = document.getElementById("lock-screen");
+      const lockPinInput = document.getElementById("lock-pin-input");
+      const lockError = document.getElementById("lock-error");
+      const lockNowBtn = document.getElementById("lock-now");
+      const pinSettingsBtn = document.getElementById("pin-settings");
+      const appEl = document.querySelector(".app");
+      const secretModal = document.getElementById("secret-modal");
+      const secretTitle = document.getElementById("secret-modal-title");
+      const secretMessage = document.getElementById("secret-modal-message");
+      const secretCurrentWrap = document.getElementById("secret-field-current-wrap");
+      const secretMainWrap = document.getElementById("secret-field-main-wrap");
+      const secretConfirmWrap = document.getElementById("secret-field-confirm-wrap");
+      const secretCurrent = document.getElementById("secret-current");
+      const secretMain = document.getElementById("secret-main");
+      const secretConfirm = document.getElementById("secret-confirm");
+      const secretCurrentLabel = document.getElementById("secret-current-label");
+      const secretMainLabel = document.getElementById("secret-main-label");
+      const secretConfirmLabel = document.getElementById("secret-confirm-label");
+      const secretError = document.getElementById("secret-error");
+      const secretNote = document.getElementById("secret-note");
+      const secretExtra = document.getElementById("secret-extra-actions");
       let toastTimer = null;
       let saveTimer = null;
       let state = { beginning: 0, txns: [], updatedAt: 0 };
       let currentUser = "";
       let applyingHash = false;
       let editingId = null;
+      let secretModalHandler = null;
+      let pendingBackupFileText = null;
+      let appStarted = false;
 
       function uid() {
         return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -1453,6 +1647,260 @@
         }
       });
 
+      function cryptoAvailable() {
+        return !!(window.crypto && crypto.subtle && window.TextEncoder);
+      }
+
+      function bytesToBase64(bytes) {
+        let binary = "";
+        const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+        arr.forEach(function (b) { binary += String.fromCharCode(b); });
+        return btoa(binary);
+      }
+
+      function base64ToBytes(b64) {
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+      }
+
+      function timingSafeEqual(a, b) {
+        if (!a || !b || a.length !== b.length) return false;
+        let diff = 0;
+        for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+        return diff === 0;
+      }
+
+      function deriveBits(secret, saltBytes, iterations) {
+        return crypto.subtle
+          .importKey("raw", new TextEncoder().encode(secret), "PBKDF2", false, ["deriveBits"])
+          .then(function (keyMaterial) {
+            return crypto.subtle.deriveBits(
+              {
+                name: "PBKDF2",
+                salt: saltBytes,
+                iterations: iterations || PBKDF2_ITERATIONS,
+                hash: "SHA-256",
+              },
+              keyMaterial,
+              256
+            );
+          });
+      }
+
+      function deriveAesKey(secret, saltBytes, iterations) {
+        return crypto.subtle
+          .importKey("raw", new TextEncoder().encode(secret), "PBKDF2", false, ["deriveKey"])
+          .then(function (keyMaterial) {
+            return crypto.subtle.deriveKey(
+              {
+                name: "PBKDF2",
+                salt: saltBytes,
+                iterations: iterations || PBKDF2_ITERATIONS,
+                hash: "SHA-256",
+              },
+              keyMaterial,
+              { name: "AES-GCM", length: 256 },
+              false,
+              ["encrypt", "decrypt"]
+            );
+          });
+      }
+
+      function encryptBackupPayload(payload, password) {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const plain = new TextEncoder().encode(JSON.stringify(payload));
+        return deriveAesKey(password, salt).then(function (key) {
+          return crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, plain).then(function (cipherBuf) {
+            return {
+              app: "digital-register",
+              version: 2,
+              encrypted: true,
+              exportedAt: payload.exportedAt,
+              kdf: "PBKDF2",
+              iterations: PBKDF2_ITERATIONS,
+              hash: "SHA-256",
+              cipher: "AES-GCM",
+              salt: bytesToBase64(salt),
+              iv: bytesToBase64(iv),
+              ciphertext: bytesToBase64(cipherBuf),
+            };
+          });
+        });
+      }
+
+      function decryptBackupEnvelope(envelope, password) {
+        try {
+          const salt = base64ToBytes(envelope.salt);
+          const iv = base64ToBytes(envelope.iv);
+          const cipherBytes = base64ToBytes(envelope.ciphertext);
+          return deriveAesKey(password, salt, envelope.iterations || PBKDF2_ITERATIONS)
+            .then(function (key) {
+              return crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, cipherBytes);
+            })
+            .then(function (plainBuf) {
+              const json = new TextDecoder().decode(plainBuf);
+              return normalizeState(JSON.parse(json));
+            })
+            .catch(function () {
+              return null;
+            });
+        } catch (e) {
+          return Promise.resolve(null);
+        }
+      }
+
+      function readPinRecord() {
+        try {
+          const raw = localStorage.getItem(PIN_KEY);
+          if (!raw) return null;
+          const data = JSON.parse(raw);
+          if (!data || !data.salt || !data.verifier) return null;
+          return data;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function hasPin() {
+        return !!readPinRecord();
+      }
+
+      function isSessionUnlocked() {
+        try {
+          return sessionStorage.getItem(UNLOCK_SESSION_KEY) === "1";
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function setSessionUnlocked(unlocked) {
+        try {
+          if (unlocked) sessionStorage.setItem(UNLOCK_SESSION_KEY, "1");
+          else sessionStorage.removeItem(UNLOCK_SESSION_KEY);
+        } catch (e) { /* ignore */ }
+      }
+
+      function createPinRecord(pin) {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        return deriveBits(pin, salt).then(function (bits) {
+          const record = {
+            version: 1,
+            kdf: "PBKDF2",
+            iterations: PBKDF2_ITERATIONS,
+            hash: "SHA-256",
+            salt: bytesToBase64(salt),
+            verifier: bytesToBase64(bits),
+          };
+          localStorage.setItem(PIN_KEY, JSON.stringify(record));
+          return record;
+        });
+      }
+
+      function verifyPin(pin) {
+        const record = readPinRecord();
+        if (!record) return Promise.resolve(false);
+        let salt;
+        let expected;
+        try {
+          salt = base64ToBytes(record.salt);
+          expected = base64ToBytes(record.verifier);
+        } catch (e) {
+          return Promise.resolve(false);
+        }
+        return deriveBits(pin, salt, record.iterations || PBKDF2_ITERATIONS).then(function (bits) {
+          return timingSafeEqual(new Uint8Array(bits), expected);
+        }).catch(function () {
+          return false;
+        });
+      }
+
+      function clearPinRecord() {
+        try {
+          localStorage.removeItem(PIN_KEY);
+        } catch (e) { /* ignore */ }
+      }
+
+      function updatePinUi() {
+        const pinned = hasPin();
+        pinSettingsBtn.textContent = pinned ? "PIN settings" : "Set PIN";
+        lockNowBtn.hidden = !pinned || !isSessionUnlocked();
+      }
+
+      function showLockScreen() {
+        appEl.classList.add("locked");
+        lockScreen.hidden = false;
+        lockError.textContent = "";
+        lockPinInput.value = "";
+        requestAnimationFrame(function () {
+          lockPinInput.focus();
+        });
+      }
+
+      function hideLockScreen() {
+        lockScreen.hidden = true;
+        appEl.classList.remove("locked");
+        lockError.textContent = "";
+        lockPinInput.value = "";
+      }
+
+      function closeSecretModal() {
+        secretModal.classList.remove("open");
+        secretModalHandler = null;
+        pendingBackupFileText = null;
+        setTimeout(function () {
+          if (!secretModal.classList.contains("open")) secretModal.hidden = true;
+        }, 200);
+        secretError.textContent = "";
+        secretCurrent.value = "";
+        secretMain.value = "";
+        secretConfirm.value = "";
+      }
+
+      function openSecretModal(options) {
+        const opts = options || {};
+        secretModalHandler = opts;
+        secretTitle.textContent = opts.title || "Password";
+        secretMessage.textContent = opts.message || "";
+        secretError.textContent = "";
+        secretNote.hidden = !opts.note;
+        secretNote.textContent = opts.note || "";
+        secretExtra.hidden = !opts.showRemovePin;
+        document.getElementById("secret-submit").textContent = opts.submitLabel || "Continue";
+
+        const showCurrent = !!opts.showCurrent;
+        const showConfirm = !!opts.showConfirm;
+        const numeric = !!opts.numeric;
+
+        secretCurrentWrap.hidden = !showCurrent;
+        secretConfirmWrap.hidden = !showConfirm;
+        secretMainWrap.hidden = opts.hideMain === true;
+
+        secretCurrentLabel.textContent = opts.currentLabel || "Current PIN";
+        secretMainLabel.textContent = opts.mainLabel || "Password";
+        secretConfirmLabel.textContent = opts.confirmLabel || "Confirm";
+
+        [secretCurrent, secretMain, secretConfirm].forEach(function (input) {
+          input.value = "";
+          input.type = "password";
+          input.inputMode = numeric ? "numeric" : "text";
+          input.autocomplete = numeric ? "one-time-code" : "off";
+          input.maxLength = numeric ? 8 : 128;
+        });
+        if (opts.mainAutocomplete) secretMain.autocomplete = opts.mainAutocomplete;
+        if (opts.currentAutocomplete) secretCurrent.autocomplete = opts.currentAutocomplete;
+
+        secretModal.hidden = false;
+        requestAnimationFrame(function () {
+          secretModal.classList.add("open");
+          const focusEl = showCurrent ? secretCurrent : secretMain;
+          if (!secretMainWrap.hidden) focusEl.focus();
+          else if (showCurrent) secretCurrent.focus();
+        });
+      }
+
       function backupPayload() {
         // Omit the in-progress blank draft; restore will create a fresh one.
         const txns = state.txns.filter(function (t) { return !isBlankDraft(t); });
@@ -1474,15 +1922,13 @@
         return "digital-register-backup-" + y + "-" + m + "-" + day + ".json";
       }
 
-      function parseBackupFile(text) {
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          return null;
-        }
+      function isEncryptedBackup(data) {
+        return !!(data && data.encrypted && data.ciphertext && data.salt && data.iv);
+      }
+
+      function parsePlainBackup(data) {
         if (!data || typeof data !== "object") return null;
-        // Accept wrapped backups and raw state objects from older saves.
+        if (isEncryptedBackup(data)) return null;
         const candidate =
           data.app === "digital-register" || "beginning" in data || "txns" in data
             ? data
@@ -1491,21 +1937,86 @@
         return normalizeState(candidate);
       }
 
-      function downloadBackup() {
-        flushPersist();
-        persist(true);
-        const json = JSON.stringify(backupPayload(), null, 2);
-        const blob = new Blob([json], { type: "application/json" });
+      function parseBackupFile(text) {
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          return { error: "invalid" };
+        }
+        if (!data || typeof data !== "object") return { error: "invalid" };
+        if (isEncryptedBackup(data)) return { encrypted: true, envelope: data };
+        const plain = parsePlainBackup(data);
+        if (!plain) return { error: "invalid" };
+        return { encrypted: false, state: plain };
+      }
+
+      function triggerDownload(text, filename) {
+        const blob = new Blob([text], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = backupFilename();
+        a.download = filename;
         a.rel = "noopener";
         document.body.appendChild(a);
         a.click();
         a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-        showToast("Backup downloaded");
+      }
+
+      function downloadBackup() {
+        if (!cryptoAvailable()) {
+          showToast("Encryption needs HTTPS or localhost");
+          return;
+        }
+        flushPersist();
+        persist(true);
+        openSecretModal({
+          title: "Encrypt backup",
+          message: "Choose a password. You will need it to restore this file.",
+          mainLabel: "Password",
+          confirmLabel: "Confirm password",
+          showConfirm: true,
+          submitLabel: "Download",
+          note: "Use a password you will remember. It is never sent anywhere.",
+          mainAutocomplete: "new-password",
+          minLength: 6,
+          onSubmit: function (values) {
+            const password = values.main;
+            const confirm = values.confirm;
+            if (!password || password.length < 6) {
+              secretError.textContent = "Use at least 6 characters";
+              return false;
+            }
+            if (password !== confirm) {
+              secretError.textContent = "Passwords do not match";
+              return false;
+            }
+            secretError.textContent = "Encrypting…";
+            encryptBackupPayload(backupPayload(), password).then(function (envelope) {
+              triggerDownload(JSON.stringify(envelope, null, 2), backupFilename());
+              closeSecretModal();
+              showToast("Encrypted backup downloaded");
+            }).catch(function () {
+              secretError.textContent = "Could not encrypt backup";
+            });
+            return false;
+          },
+        });
+      }
+
+      function confirmAndApplyRestore(restored) {
+        if (!restored) {
+          showToast("Invalid backup file");
+          return;
+        }
+        const hasSavedData =
+          parseMoney(state.beginning) ||
+          state.txns.some(function (t) { return !isBlankDraft(t); });
+        if (hasSavedData) {
+          if (!confirm("Replace the current register with this backup?")) return;
+        }
+        applyRestoredState(restored);
       }
 
       function applyRestoredState(restored) {
@@ -1519,6 +2030,175 @@
             ? "Restored " + count + " entr" + (count === 1 ? "y" : "ies")
             : "Backup restored"
         );
+      }
+
+      function promptDecryptAndRestore(envelope) {
+        if (!cryptoAvailable()) {
+          showToast("Decryption needs HTTPS or localhost");
+          return;
+        }
+        openSecretModal({
+          title: "Unlock backup",
+          message: "Enter the password used when this backup was downloaded.",
+          mainLabel: "Password",
+          submitLabel: "Restore",
+          mainAutocomplete: "current-password",
+          onSubmit: function (values) {
+            const password = values.main;
+            if (!password) {
+              secretError.textContent = "Enter the backup password";
+              return false;
+            }
+            secretError.textContent = "Decrypting…";
+            decryptBackupEnvelope(envelope, password).then(function (restored) {
+              if (!restored) {
+                secretError.textContent = "Wrong password or damaged file";
+                return;
+              }
+              closeSecretModal();
+              confirmAndApplyRestore(restored);
+            });
+            return false;
+          },
+        });
+      }
+
+      function isValidPin(pin) {
+        return /^\d{4,8}$/.test(String(pin || ""));
+      }
+
+      function openPinSettings() {
+        if (!cryptoAvailable()) {
+          showToast("PIN lock needs HTTPS or localhost");
+          return;
+        }
+        if (!hasPin()) {
+          openSecretModal({
+            title: "Set PIN",
+            message: "Choose a 4–8 digit PIN to lock this register on this device.",
+            mainLabel: "PIN",
+            confirmLabel: "Confirm PIN",
+            showConfirm: true,
+            numeric: true,
+            submitLabel: "Save PIN",
+            note: "PIN stays on this device only. It slows casual access; it is not full encryption of browser storage.",
+            onSubmit: function (values) {
+              if (!isValidPin(values.main)) {
+                secretError.textContent = "PIN must be 4–8 digits";
+                return false;
+              }
+              if (values.main !== values.confirm) {
+                secretError.textContent = "PINs do not match";
+                return false;
+              }
+              secretError.textContent = "Saving…";
+              createPinRecord(values.main).then(function () {
+                setSessionUnlocked(true);
+                updatePinUi();
+                closeSecretModal();
+                showToast("PIN saved");
+              }).catch(function () {
+                secretError.textContent = "Could not save PIN";
+              });
+              return false;
+            },
+          });
+          return;
+        }
+
+        openSecretModal({
+          title: "PIN settings",
+          message: "Enter your current PIN to change it, or remove the lock.",
+          showCurrent: true,
+          currentLabel: "Current PIN",
+          mainLabel: "New PIN",
+          confirmLabel: "Confirm new PIN",
+          showConfirm: true,
+          numeric: true,
+          showRemovePin: true,
+          submitLabel: "Change PIN",
+          onSubmit: function (values) {
+            if (!isValidPin(values.current)) {
+              secretError.textContent = "Enter your current PIN";
+              return false;
+            }
+            if (!isValidPin(values.main)) {
+              secretError.textContent = "New PIN must be 4–8 digits";
+              return false;
+            }
+            if (values.main !== values.confirm) {
+              secretError.textContent = "New PINs do not match";
+              return false;
+            }
+            secretError.textContent = "Checking…";
+            verifyPin(values.current).then(function (ok) {
+              if (!ok) {
+                secretError.textContent = "Current PIN is incorrect";
+                return;
+              }
+              return createPinRecord(values.main).then(function () {
+                setSessionUnlocked(true);
+                updatePinUi();
+                closeSecretModal();
+                showToast("PIN updated");
+              });
+            }).catch(function () {
+              secretError.textContent = "Could not update PIN";
+            });
+            return false;
+          },
+          onRemovePin: function (values) {
+            if (!isValidPin(values.current)) {
+              secretError.textContent = "Enter your current PIN to remove it";
+              return false;
+            }
+            secretError.textContent = "Checking…";
+            verifyPin(values.current).then(function (ok) {
+              if (!ok) {
+                secretError.textContent = "Current PIN is incorrect";
+                return;
+              }
+              clearPinRecord();
+              setSessionUnlocked(true);
+              updatePinUi();
+              closeSecretModal();
+              showToast("PIN removed");
+            });
+            return false;
+          },
+        });
+      }
+
+      function startApp() {
+        if (appStarted) return;
+        appStarted = true;
+        hideLockScreen();
+        setSessionUnlocked(true);
+        updatePinUi();
+        loadUser();
+        updateUserBar();
+        loadState();
+        render();
+        if (!currentUser) {
+          openUserModal({ requireName: true });
+        }
+      }
+
+      function tryUnlockWithPin() {
+        const pin = String(lockPinInput.value || "").trim();
+        if (!isValidPin(pin)) {
+          lockError.textContent = "Enter your 4–8 digit PIN";
+          return;
+        }
+        lockError.textContent = "Checking…";
+        verifyPin(pin).then(function (ok) {
+          if (!ok) {
+            lockError.textContent = "Incorrect PIN";
+            lockPinInput.select();
+            return;
+          }
+          startApp();
+        });
       }
 
       document.getElementById("download-backup").addEventListener("click", downloadBackup);
@@ -1538,19 +2218,16 @@
           showToast("Could not read backup file");
         };
         reader.onload = function () {
-          const restored = parseBackupFile(String(reader.result || ""));
-          if (!restored) {
+          const parsed = parseBackupFile(String(reader.result || ""));
+          if (parsed.error) {
             showToast("Invalid backup file");
             return;
           }
-          // A blank in-progress draft alone is not real data worth confirming over.
-          const hasSavedData =
-            parseMoney(state.beginning) ||
-            state.txns.some(function (t) { return !isBlankDraft(t); });
-          if (hasSavedData) {
-            if (!confirm("Replace the current register with this backup?")) return;
+          if (parsed.encrypted) {
+            promptDecryptAndRestore(parsed.envelope);
+            return;
           }
-          applyRestoredState(restored);
+          confirmAndApplyRestore(parsed.state);
         };
         reader.readAsText(file);
       });
@@ -1561,6 +2238,50 @@
         persist(true);
         render();
         showToast("Register cleared");
+      });
+
+      pinSettingsBtn.addEventListener("click", openPinSettings);
+      lockNowBtn.addEventListener("click", function () {
+        if (!hasPin()) return;
+        setSessionUnlocked(false);
+        updatePinUi();
+        appStarted = false;
+        showLockScreen();
+      });
+      document.getElementById("lock-unlock").addEventListener("click", tryUnlockWithPin);
+      lockPinInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          tryUnlockWithPin();
+        }
+      });
+
+      document.getElementById("secret-cancel").addEventListener("click", closeSecretModal);
+      document.getElementById("secret-submit").addEventListener("click", function () {
+        if (!secretModalHandler || !secretModalHandler.onSubmit) return;
+        secretModalHandler.onSubmit({
+          current: secretCurrent.value,
+          main: secretMain.value,
+          confirm: secretConfirm.value,
+        });
+      });
+      document.getElementById("secret-remove-pin").addEventListener("click", function () {
+        if (!secretModalHandler || !secretModalHandler.onRemovePin) return;
+        secretModalHandler.onRemovePin({
+          current: secretCurrent.value,
+          main: secretMain.value,
+          confirm: secretConfirm.value,
+        });
+      });
+      secretModal.addEventListener("click", function (e) {
+        if (e.target === secretModal) closeSecretModal();
+      });
+      [secretCurrent, secretMain, secretConfirm].forEach(function (input) {
+        input.addEventListener("keydown", function (e) {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          document.getElementById("secret-submit").click();
+        });
       });
 
       window.addEventListener("hashchange", function () {
@@ -1596,12 +2317,12 @@
         navigator.storage.persist().catch(function () { /* ignore */ });
       }
 
-      loadUser();
-      updateUserBar();
-      loadState();
-      render();
-      if (!currentUser) {
-        openUserModal({ requireName: true });
+      updatePinUi();
+      if (hasPin() && !isSessionUnlocked()) {
+        // Keep register data unloaded visually until PIN unlock.
+        showLockScreen();
+      } else {
+        startApp();
       }
     })();
   </script>

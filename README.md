@@ -4,7 +4,11 @@ A mobile-friendly digital check register that runs entirely in the browser.
 
 **Columns:** No./Code · Date · Transaction description · Payment / fee / withdrawal · Deposit · Balance (running)
 
-Enter a **beginning balance**, add rows, and the balance column updates from prior amounts. Data is stored in `localStorage` and mirrored into the URL hash so you can bookmark or share a register link—handy on iPhone Safari. Use **Download backup** / **Restore backup** to keep a local JSON copy in case browser storage is cleared.
+Enter a **beginning balance**, add rows, and the balance column updates from prior amounts. Data is stored in `localStorage` and mirrored into the URL hash so you can bookmark or share a register link—handy on iPhone Safari.
+
+**Backup:** **Download backup** encrypts the register with a password (AES-GCM via Web Crypto) before saving a JSON file; **Restore backup** decrypts with that password. Older unencrypted backups still restore.
+
+**PIN (optional):** **Set PIN** adds a local lock screen on this device. It is a casual access barrier stored only in the browser—not server-side authentication.
 
 ## Run locally
 
