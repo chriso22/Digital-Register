@@ -10,6 +10,8 @@ Enter a **beginning balance**, add rows, and the balance column updates from pri
 
 **PIN (optional):** **Set PIN** adds a local lock screen on this device. It is a casual access barrier stored only in the browser—not server-side authentication.
 
+**Sub-registers (budgets):** **New budget** sets money aside for a purpose and posts a payment on the main register. **Spend** draws down that envelope without another main-register payment (the cash was already earmarked). **Clear** removes the sub-register; any unused leftover is deposited back. **Add** tops up an existing budget.
+
 ## Run locally
 
 ```bash

@@ -144,6 +144,121 @@
 
     .balance-value.neg { color: var(--payment); }
 
+    .balance-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      margin-top: 0.65rem;
+    }
+
+    .balance-meta-item {
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+    }
+
+    .balance-meta-item strong {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .budgets {
+      margin-bottom: 0.85rem;
+      padding: 0.75rem;
+      border: 1px solid rgba(183, 199, 189, 0.9);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .budgets-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.55rem;
+    }
+
+    .budgets-head h2 {
+      margin: 0;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+
+    .budgets-head .btn-ghost {
+      padding: 0.4rem 0.85rem;
+      font-size: 0.82rem;
+    }
+
+    .budgets-intro {
+      margin: 0 0 0.65rem;
+      font-size: 0.82rem;
+      color: var(--ink-soft);
+      line-height: 1.35;
+    }
+
+    .budget-list {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .budget-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.45rem 0.75rem;
+      align-items: center;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid rgba(183, 199, 189, 0.7);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.8);
+      animation: slideIn 0.3s ease-out both;
+    }
+
+    .budget-name {
+      font-weight: 600;
+      color: var(--ink);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .budget-amount {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .budget-amount.spent-out {
+      color: var(--ink-soft);
+    }
+
+    .budget-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .budget-actions .btn-ghost,
+    .budget-actions .btn-danger,
+    .budget-actions .btn-primary {
+      flex: 0 0 auto;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.78rem;
+    }
+
+    .budgets-empty {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+    }
+
     .toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -163,6 +278,12 @@
     }
 
     button:active { transform: scale(0.97); }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     .btn-primary {
       background: var(--accent);
@@ -602,16 +723,26 @@
 
     .modal input[type="password"],
     .modal input[type="text"],
-    .modal input[type="tel"] {
+    .modal input[type="tel"],
+    .modal input[type="number"] {
       width: 100%;
       font: inherit;
       font-size: 1.05rem;
-      letter-spacing: 0.08em;
       padding: 0.7rem 0.8rem;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: #fff;
       color: var(--ink);
+    }
+
+    .modal input[type="password"],
+    .modal input[type="tel"] {
+      letter-spacing: 0.08em;
+    }
+
+    .modal input[type="number"] {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
     }
 
     .modal .field-error {
@@ -763,6 +894,9 @@
       <div class="balance-summary">
         <span class="balance-label" id="current-balance-heading">Current balance</span>
         <span id="running-balance" class="balance-value">$0.00</span>
+        <div class="balance-meta" id="balance-meta" hidden>
+          <span class="balance-meta-item">In budgets <strong id="budgeted-total">$0.00</strong></span>
+        </div>
       </div>
 
       <div class="user-bar" id="user-bar" hidden>
@@ -770,6 +904,17 @@
         <button type="button" class="btn-link" id="change-user">Change name</button>
         <button type="button" class="btn-link" id="pin-settings">Set PIN</button>
       </div>
+
+      <section class="budgets" aria-labelledby="budgets-heading">
+        <div class="budgets-head">
+          <h2 id="budgets-heading">Sub-registers</h2>
+          <button type="button" class="btn-ghost" id="add-budget">New budget</button>
+        </div>
+        <p class="budgets-intro">
+          Set money aside for a purpose—it deducts from the main register. Spend it down here, then clear the sub-register when it’s used up (unused leftovers return to the register).
+        </p>
+        <div id="budget-list" class="budget-list" aria-live="polite"></div>
+      </section>
 
       <div class="toolbar">
         <button type="button" class="btn-ghost" id="share-link">Copy share link</button>
@@ -818,7 +963,7 @@
       </div>
 
       <p class="hint">
-        Edits save in this browser and in the page URL hash. Backups are password-encrypted on your device before download. An optional PIN can lock the screen on this phone—it is a local barrier, not server-side security. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it.
+        Edits save in this browser and in the page URL hash. Backups are password-encrypted on your device before download. An optional PIN can lock the screen on this phone—it is a local barrier, not server-side security. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it. Sub-registers are budgeting envelopes: allocating posts a payment on the main register; clearing returns any leftover.
       </p>
     </section>
   </div>
@@ -855,6 +1000,41 @@
       />
       <div class="modal-actions">
         <button type="button" class="btn-primary" id="user-name-save">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="budget-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="budget-modal-title" hidden>
+    <div class="modal">
+      <h2 id="budget-modal-title">New budget</h2>
+      <p id="budget-modal-message">Name a purpose and set aside an amount from the main register.</p>
+      <div id="budget-name-wrap">
+        <label for="budget-name-input">Name</label>
+        <input
+          id="budget-name-input"
+          type="text"
+          maxlength="40"
+          autocomplete="off"
+          placeholder="e.g. Groceries or Car repair"
+        />
+      </div>
+      <div id="budget-amount-wrap">
+        <label for="budget-amount-input" id="budget-amount-label">Amount</label>
+        <input
+          id="budget-amount-input"
+          class="money"
+          type="number"
+          inputmode="decimal"
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          autocomplete="off"
+        />
+      </div>
+      <p class="field-error" id="budget-error" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="budget-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="budget-submit">Save</button>
       </div>
     </div>
   </div>
@@ -898,6 +1078,9 @@
       const PBKDF2_ITERATIONS = 310000;
       const beginningInput = document.getElementById("beginning-balance");
       const runningEl = document.getElementById("running-balance");
+      const balanceMeta = document.getElementById("balance-meta");
+      const budgetedTotalEl = document.getElementById("budgeted-total");
+      const budgetListEl = document.getElementById("budget-list");
       const listEl = document.getElementById("txn-list");
       const tbodyEl = document.getElementById("txn-tbody");
       const toastEl = document.getElementById("toast");
@@ -905,6 +1088,16 @@
       const userDisplay = document.getElementById("user-display");
       const userModal = document.getElementById("user-modal");
       const userNameInput = document.getElementById("user-name-input");
+      const budgetModal = document.getElementById("budget-modal");
+      const budgetModalTitle = document.getElementById("budget-modal-title");
+      const budgetModalMessage = document.getElementById("budget-modal-message");
+      const budgetNameWrap = document.getElementById("budget-name-wrap");
+      const budgetAmountWrap = document.getElementById("budget-amount-wrap");
+      const budgetNameInput = document.getElementById("budget-name-input");
+      const budgetAmountInput = document.getElementById("budget-amount-input");
+      const budgetAmountLabel = document.getElementById("budget-amount-label");
+      const budgetError = document.getElementById("budget-error");
+      const budgetSubmitBtn = document.getElementById("budget-submit");
       const lockScreen = document.getElementById("lock-screen");
       const lockPinInput = document.getElementById("lock-pin-input");
       const lockError = document.getElementById("lock-error");
@@ -928,11 +1121,13 @@
       const secretExtra = document.getElementById("secret-extra-actions");
       let toastTimer = null;
       let saveTimer = null;
-      let state = { beginning: 0, txns: [], updatedAt: 0 };
+      let state = { beginning: 0, txns: [], budgets: [], updatedAt: 0 };
       let currentUser = "";
       let applyingHash = false;
       let editingId = null;
       let secretModalHandler = null;
+      let budgetModalMode = null;
+      let budgetModalTargetId = null;
       let pendingBackupFileText = null;
       let appStarted = false;
 
@@ -941,18 +1136,23 @@
       }
 
       function emptyState() {
-        return { beginning: 0, txns: [], updatedAt: 0 };
+        return { beginning: 0, txns: [], budgets: [], updatedAt: 0 };
       }
 
       function isEmptyState(data) {
         if (!data) return true;
-        return !parseMoney(data.beginning) && !(data.txns && data.txns.length);
+        return (
+          !parseMoney(data.beginning) &&
+          !(data.txns && data.txns.length) &&
+          !(data.budgets && data.budgets.length)
+        );
       }
 
       function stateRichness(data) {
         if (!data) return 0;
         const txns = Array.isArray(data.txns) ? data.txns.length : 0;
-        return txns * 1000 + (parseMoney(data.beginning) ? 1 : 0);
+        const budgets = Array.isArray(data.budgets) ? data.budgets.length : 0;
+        return txns * 1000 + budgets * 100 + (parseMoney(data.beginning) ? 1 : 0);
       }
 
       function normalizeState(data) {
@@ -960,6 +1160,9 @@
         return {
           beginning: parseMoney(data.beginning),
           txns: Array.isArray(data.txns) ? data.txns.map(normalizeTxn) : [],
+          budgets: Array.isArray(data.budgets)
+            ? data.budgets.map(normalizeBudget).filter(function (b) { return !!b.name; })
+            : [],
           updatedAt: Number(data.updatedAt) || 0,
         };
       }
@@ -1002,8 +1205,12 @@
         return String(value || "").trim().slice(0, 24);
       }
 
+      function roundMoney(n) {
+        return Math.round((parseMoney(n) + Number.EPSILON) * 100) / 100;
+      }
+
       function normalizeTxn(t) {
-        return {
+        const txn = {
           id: t.id || uid(),
           code: String(t.code || ""),
           date: String(t.date || todayISO()),
@@ -1012,6 +1219,39 @@
           deposit: parseMoney(t.deposit),
           author: normalizeAuthor(t.author),
         };
+        if (t.budgetId) txn.budgetId = String(t.budgetId);
+        if (t.kind) txn.kind = String(t.kind);
+        return txn;
+      }
+
+      function normalizeBudget(b) {
+        if (!b || typeof b !== "object") {
+          return { id: uid(), name: "", remaining: 0, allocated: 0, author: "", createdAt: 0 };
+        }
+        const remaining = roundMoney(b.remaining);
+        const allocated = roundMoney(
+          b.allocated !== undefined && b.allocated !== null ? b.allocated : remaining
+        );
+        return {
+          id: b.id || uid(),
+          name: String(b.name || "").trim().slice(0, 40),
+          remaining: remaining,
+          allocated: allocated,
+          author: normalizeAuthor(b.author),
+          createdAt: Number(b.createdAt) || 0,
+        };
+      }
+
+      function totalBudgetRemaining() {
+        return roundMoney(
+          (state.budgets || []).reduce(function (sum, b) {
+            return sum + parseMoney(b.remaining);
+          }, 0)
+        );
+      }
+
+      function findBudget(id) {
+        return (state.budgets || []).find(function (b) { return b.id === id; }) || null;
       }
 
       function loadUser() {
@@ -1169,6 +1409,7 @@
           const encoded = encodeState({
             beginning: state.beginning,
             txns: state.txns,
+            budgets: state.budgets || [],
             updatedAt: state.updatedAt,
           });
           applyingHash = true;
@@ -1220,6 +1461,310 @@
         const finalBal = bals.length ? bals[bals.length - 1] : parseMoney(state.beginning);
         runningEl.textContent = formatMoney(finalBal);
         runningEl.classList.toggle("neg", finalBal < 0);
+        const budgeted = totalBudgetRemaining();
+        if (budgeted > 0 || (state.budgets && state.budgets.length)) {
+          balanceMeta.hidden = false;
+          budgetedTotalEl.textContent = formatMoney(budgeted);
+        } else {
+          balanceMeta.hidden = true;
+        }
+      }
+
+      function closeBudgetModal() {
+        budgetModal.classList.remove("open");
+        budgetModalMode = null;
+        budgetModalTargetId = null;
+        setTimeout(function () {
+          if (!budgetModal.classList.contains("open")) budgetModal.hidden = true;
+        }, 200);
+        budgetError.textContent = "";
+        budgetNameInput.value = "";
+        budgetAmountInput.value = "";
+      }
+
+      function openBudgetModal(mode, budgetId) {
+        budgetModalMode = mode;
+        budgetModalTargetId = budgetId || null;
+        budgetError.textContent = "";
+        budgetNameInput.value = "";
+        budgetAmountInput.value = "";
+
+        const budget = budgetId ? findBudget(budgetId) : null;
+
+        if (mode === "create") {
+          budgetModalTitle.textContent = "New budget";
+          budgetModalMessage.textContent =
+            "Name a purpose and set aside an amount. It posts as a payment on the main register.";
+          budgetNameWrap.hidden = false;
+          budgetAmountWrap.hidden = false;
+          budgetAmountLabel.textContent = "Amount to allocate";
+          budgetSubmitBtn.textContent = "Allocate";
+        } else if (mode === "spend") {
+          budgetModalTitle.textContent = "Spend from budget";
+          budgetModalMessage.textContent = budget
+            ? "Record spending against “" + budget.name + "” (" + formatMoney(budget.remaining) + " left). This does not create another main-register payment—the money was already set aside."
+            : "Record spending against this budget.";
+          budgetNameWrap.hidden = true;
+          budgetAmountWrap.hidden = false;
+          budgetAmountLabel.textContent = "Amount spent";
+          budgetSubmitBtn.textContent = "Record spend";
+        } else if (mode === "add") {
+          budgetModalTitle.textContent = "Add to budget";
+          budgetModalMessage.textContent = budget
+            ? "Allocate more to “" + budget.name + "”. This deducts from the main register."
+            : "Allocate more to this budget.";
+          budgetNameWrap.hidden = true;
+          budgetAmountWrap.hidden = false;
+          budgetAmountLabel.textContent = "Amount to add";
+          budgetSubmitBtn.textContent = "Allocate more";
+        } else {
+          return;
+        }
+
+        budgetModal.hidden = false;
+        requestAnimationFrame(function () {
+          budgetModal.classList.add("open");
+          const focusEl = mode === "create" ? budgetNameInput : budgetAmountInput;
+          focusEl.focus();
+          if (typeof focusEl.select === "function") focusEl.select();
+        });
+      }
+
+      function insertRegisterTxn(txn) {
+        // Keep any trailing blank draft at the end so the entry form stays last.
+        const last = state.txns.length ? state.txns[state.txns.length - 1] : null;
+        if (last && isBlankDraft(last)) {
+          state.txns.splice(state.txns.length - 1, 0, txn);
+        } else {
+          state.txns.push(txn);
+        }
+      }
+
+      function createBudget(name, amount, author) {
+        const budget = {
+          id: uid(),
+          name: name,
+          remaining: amount,
+          allocated: amount,
+          author: author,
+          createdAt: Date.now(),
+        };
+        const txn = {
+          id: uid(),
+          code: "BUDGET",
+          date: todayISO(),
+          description: "Budget → " + name,
+          payment: amount,
+          deposit: 0,
+          author: author,
+          budgetId: budget.id,
+          kind: "budget-allocate",
+        };
+        if (!state.budgets) state.budgets = [];
+        state.budgets.push(budget);
+        insertRegisterTxn(txn);
+        persist(true);
+        render();
+        showToast("Allocated " + formatMoney(amount) + " to " + name);
+      }
+
+      function addToBudget(id, amount, author) {
+        const budget = findBudget(id);
+        if (!budget) return;
+        budget.remaining = roundMoney(budget.remaining + amount);
+        budget.allocated = roundMoney(budget.allocated + amount);
+        insertRegisterTxn({
+          id: uid(),
+          code: "BUDGET",
+          date: todayISO(),
+          description: "Budget → " + budget.name,
+          payment: amount,
+          deposit: 0,
+          author: author,
+          budgetId: budget.id,
+          kind: "budget-allocate",
+        });
+        persist(true);
+        render();
+        showToast("Added " + formatMoney(amount) + " to " + budget.name);
+      }
+
+      function spendFromBudget(id, amount) {
+        const budget = findBudget(id);
+        if (!budget) return;
+        if (amount > budget.remaining + 0.0001) {
+          showToast("Only " + formatMoney(budget.remaining) + " left in this budget");
+          return;
+        }
+        budget.remaining = roundMoney(budget.remaining - amount);
+        persist(true);
+        render();
+        if (budget.remaining <= 0) {
+          showToast(budget.name + " fully spent — clear when ready");
+        } else {
+          showToast("Spent " + formatMoney(amount) + " from " + budget.name);
+        }
+      }
+
+      function clearBudget(id) {
+        const budget = findBudget(id);
+        if (!budget) return;
+        const leftover = roundMoney(budget.remaining);
+        const name = budget.name;
+        state.budgets = state.budgets.filter(function (b) { return b.id !== id; });
+        if (leftover > 0) {
+          ensureUser(function (author) {
+            insertRegisterTxn({
+              id: uid(),
+              code: "BUDGET",
+              date: todayISO(),
+              description: "Budget ← " + name + " (unused)",
+              payment: 0,
+              deposit: leftover,
+              author: author,
+              budgetId: id,
+              kind: "budget-return",
+            });
+            persist(true);
+            render();
+            showToast("Cleared " + name + " — returned " + formatMoney(leftover));
+          });
+          return;
+        }
+        persist(true);
+        render();
+        showToast("Cleared " + name);
+      }
+
+      function promptClearBudget(id) {
+        const budget = findBudget(id);
+        if (!budget) return;
+        const leftover = roundMoney(budget.remaining);
+        const msg = leftover > 0
+          ? "Clear “" + budget.name + "”? " + formatMoney(leftover) + " unused will return to the main register."
+          : "Clear “" + budget.name + "”? It is fully spent and will be removed.";
+        if (!confirm(msg)) return;
+        clearBudget(id);
+      }
+
+      function submitBudgetModal() {
+        const mode = budgetModalMode;
+        if (!mode) return;
+
+        if (mode === "create") {
+          const name = String(budgetNameInput.value || "").trim().slice(0, 40);
+          const amount = roundMoney(budgetAmountInput.value);
+          if (!name) {
+            budgetError.textContent = "Enter a budget name";
+            budgetNameInput.focus();
+            return;
+          }
+          if (!(amount > 0)) {
+            budgetError.textContent = "Enter an amount greater than zero";
+            budgetAmountInput.focus();
+            return;
+          }
+          ensureUser(function (author) {
+            closeBudgetModal();
+            createBudget(name, amount, author);
+          });
+          return;
+        }
+
+        const amount = roundMoney(budgetAmountInput.value);
+        if (!(amount > 0)) {
+          budgetError.textContent = "Enter an amount greater than zero";
+          budgetAmountInput.focus();
+          return;
+        }
+
+        if (mode === "spend") {
+          const targetId = budgetModalTargetId;
+          const budget = findBudget(targetId);
+          if (!budget) {
+            closeBudgetModal();
+            return;
+          }
+          if (amount > budget.remaining + 0.0001) {
+            budgetError.textContent = "Only " + formatMoney(budget.remaining) + " remaining";
+            budgetAmountInput.focus();
+            return;
+          }
+          closeBudgetModal();
+          spendFromBudget(targetId, amount);
+          return;
+        }
+
+        if (mode === "add") {
+          const targetId = budgetModalTargetId;
+          ensureUser(function (author) {
+            closeBudgetModal();
+            addToBudget(targetId, amount, author);
+          });
+        }
+      }
+
+      function renderBudgets() {
+        budgetListEl.innerHTML = "";
+        const budgets = state.budgets || [];
+        if (!budgets.length) {
+          const empty = document.createElement("p");
+          empty.className = "budgets-empty";
+          empty.textContent = "No sub-registers yet. Create one to earmark spending.";
+          budgetListEl.appendChild(empty);
+          return;
+        }
+
+        budgets.forEach(function (budget) {
+          const row = document.createElement("div");
+          row.className = "budget-row";
+          row.setAttribute("data-budget-id", budget.id);
+
+          const nameEl = document.createElement("div");
+          nameEl.className = "budget-name";
+          nameEl.textContent = budget.name;
+
+          const amountEl = document.createElement("div");
+          amountEl.className = "budget-amount" + (budget.remaining <= 0 ? " spent-out" : "");
+          amountEl.textContent = formatMoney(budget.remaining);
+
+          const actions = document.createElement("div");
+          actions.className = "budget-actions";
+
+          const spendBtn = document.createElement("button");
+          spendBtn.type = "button";
+          spendBtn.className = "btn-primary";
+          spendBtn.textContent = "Spend";
+          spendBtn.disabled = budget.remaining <= 0;
+          spendBtn.addEventListener("click", function () {
+            openBudgetModal("spend", budget.id);
+          });
+
+          const addBtn = document.createElement("button");
+          addBtn.type = "button";
+          addBtn.className = "btn-ghost";
+          addBtn.textContent = "Add";
+          addBtn.addEventListener("click", function () {
+            openBudgetModal("add", budget.id);
+          });
+
+          const clearBtn = document.createElement("button");
+          clearBtn.type = "button";
+          clearBtn.className = "btn-danger";
+          clearBtn.textContent = "Clear";
+          clearBtn.addEventListener("click", function () {
+            promptClearBudget(budget.id);
+          });
+
+          actions.appendChild(spendBtn);
+          actions.appendChild(addBtn);
+          actions.appendChild(clearBtn);
+
+          row.appendChild(nameEl);
+          row.appendChild(amountEl);
+          row.appendChild(actions);
+          budgetListEl.appendChild(row);
+        });
       }
 
       var FIELD_ORDER = ["code", "date", "description", "payment", "deposit"];
@@ -1496,6 +2041,7 @@
 
       function render(animateId) {
         ensureCurrentEntry();
+        if (!state.budgets) state.budgets = [];
 
         beginningInput.value =
           state.beginning === 0 || state.beginning === ""
@@ -1503,6 +2049,7 @@
             : String(state.beginning);
 
         const bals = runningBalances();
+        renderBudgets();
         listEl.innerHTML = "";
         tbodyEl.innerHTML = "";
 
@@ -1910,6 +2457,7 @@
           exportedAt: new Date().toISOString(),
           beginning: state.beginning,
           txns: txns,
+          budgets: state.budgets || [],
           updatedAt: state.updatedAt || Date.now(),
         };
       }
@@ -2012,7 +2560,8 @@
         }
         const hasSavedData =
           parseMoney(state.beginning) ||
-          state.txns.some(function (t) { return !isBlankDraft(t); });
+          state.txns.some(function (t) { return !isBlankDraft(t); }) ||
+          (state.budgets && state.budgets.length);
         if (hasSavedData) {
           if (!confirm("Replace the current register with this backup?")) return;
         }
@@ -2232,8 +2781,31 @@
         reader.readAsText(file);
       });
 
+      document.getElementById("add-budget").addEventListener("click", function () {
+        ensureUser(function () {
+          openBudgetModal("create");
+        });
+      });
+
+      document.getElementById("budget-cancel").addEventListener("click", closeBudgetModal);
+      document.getElementById("budget-submit").addEventListener("click", submitBudgetModal);
+      budgetModal.addEventListener("click", function (e) {
+        if (e.target === budgetModal) closeBudgetModal();
+      });
+      [budgetNameInput, budgetAmountInput].forEach(function (input) {
+        input.addEventListener("keydown", function (e) {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          if (input === budgetNameInput && !budgetAmountWrap.hidden) {
+            budgetAmountInput.focus();
+            return;
+          }
+          submitBudgetModal();
+        });
+      });
+
       document.getElementById("clear-all").addEventListener("click", function () {
-        if (!confirm("Clear beginning balance and all entries?")) return;
+        if (!confirm("Clear beginning balance, all entries, and sub-registers?")) return;
         state = emptyState();
         persist(true);
         render();
