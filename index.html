@@ -164,7 +164,7 @@
     }
 
     .budgets {
-      margin-bottom: 0.85rem;
+      margin-top: 1rem;
       padding: 0.75rem;
       border: 1px solid rgba(183, 199, 189, 0.9);
       border-radius: var(--radius);
@@ -513,6 +513,61 @@
 
     .history-row .h-act {
       text-align: right;
+    }
+
+    .history-more {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.35rem 0.75rem;
+      width: 100%;
+      margin: 0;
+      padding: 0.65rem 0.7rem;
+      border: none;
+      border-top: 1px solid rgba(183, 199, 189, 0.7);
+      border-radius: 0;
+      background: rgba(238, 243, 239, 0.7);
+      color: var(--accent);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .history-more:hover,
+    .history-more:focus-visible {
+      background: rgba(226, 235, 229, 0.95);
+    }
+
+    .history-more-meta {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--ink-soft);
+    }
+
+    .history-older {
+      border-top: 1px dashed var(--line);
+    }
+
+    .history-older[hidden] {
+      display: none;
+    }
+
+    table.register tr.history-more-row td {
+      padding: 0;
+      border-bottom: 1px solid rgba(183, 199, 189, 0.55);
+    }
+
+    table.register tr.history-more-row .history-more {
+      border-top: none;
+    }
+
+    table.register tr.history-older-row[hidden] {
+      display: none;
     }
 
     .btn-icon {
@@ -905,17 +960,6 @@
         <button type="button" class="btn-link" id="pin-settings">Set PIN</button>
       </div>
 
-      <section class="budgets" aria-labelledby="budgets-heading">
-        <div class="budgets-head">
-          <h2 id="budgets-heading">Sub-registers</h2>
-          <button type="button" class="btn-ghost" id="add-budget">New budget</button>
-        </div>
-        <p class="budgets-intro">
-          Set money aside for a purpose—it deducts from the main register. Spend it down here, then clear the sub-register when it’s used up (unused leftovers return to the register).
-        </p>
-        <div id="budget-list" class="budget-list" aria-live="polite"></div>
-      </section>
-
       <div class="toolbar">
         <button type="button" class="btn-ghost" id="share-link">Copy share link</button>
         <button type="button" class="btn-ghost" id="download-backup">Download backup</button>
@@ -948,6 +992,17 @@
           <tbody id="txn-tbody"></tbody>
         </table>
       </div>
+
+      <section class="budgets" aria-labelledby="budgets-heading">
+        <div class="budgets-head">
+          <h2 id="budgets-heading">Sub-registers</h2>
+          <button type="button" class="btn-ghost" id="add-budget">New budget</button>
+        </div>
+        <p class="budgets-intro">
+          Set money aside for a purpose—it deducts from the main register. Spend it down here, then clear the sub-register when it’s used up (unused leftovers return to the register).
+        </p>
+        <div id="budget-list" class="budget-list" aria-live="polite"></div>
+      </section>
 
       <div class="beginning-block">
         <label for="beginning-balance" id="balance-heading">Beginning balance</label>
@@ -1119,12 +1174,14 @@
       const secretError = document.getElementById("secret-error");
       const secretNote = document.getElementById("secret-note");
       const secretExtra = document.getElementById("secret-extra-actions");
+      const HISTORY_VISIBLE = 8;
       let toastTimer = null;
       let saveTimer = null;
       let state = { beginning: 0, txns: [], budgets: [], updatedAt: 0 };
       let currentUser = "";
       let applyingHash = false;
       let editingId = null;
+      let historyExpanded = false;
       let secretModalHandler = null;
       let budgetModalMode = null;
       let budgetModalTargetId = null;
@@ -2020,6 +2077,60 @@
         return row;
       }
 
+      function summarizeTxns(txns) {
+        let pay = 0;
+        let dep = 0;
+        txns.forEach(function (txn) {
+          pay += parseMoney(txn.payment);
+          dep += parseMoney(txn.deposit);
+        });
+        return {
+          count: txns.length,
+          pay: roundMoney(pay),
+          dep: roundMoney(dep),
+        };
+      }
+
+      function historyMoreLabel(olderTxns) {
+        const summary = summarizeTxns(olderTxns);
+        const countLabel =
+          summary.count + " older entr" + (summary.count === 1 ? "y" : "ies");
+        if (historyExpanded) {
+          return { title: "Hide older entries", meta: countLabel };
+        }
+        const bits = [];
+        if (summary.pay) bits.push(formatMoney(summary.pay) + " paid");
+        if (summary.dep) bits.push(formatMoney(summary.dep) + " deposited");
+        return {
+          title: "Show " + countLabel,
+          meta: bits.length ? bits.join(" · ") : "Tap to review",
+        };
+      }
+
+      function toggleHistoryExpanded() {
+        historyExpanded = !historyExpanded;
+        render();
+      }
+
+      function buildHistoryMoreButton(olderTxns) {
+        const label = historyMoreLabel(olderTxns);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "history-more";
+        btn.setAttribute("aria-expanded", historyExpanded ? "true" : "false");
+
+        const title = document.createElement("span");
+        title.textContent = label.title;
+        const meta = document.createElement("span");
+        meta.className = "history-more-meta";
+        meta.textContent = label.meta;
+
+        btn.appendChild(title);
+        btn.appendChild(meta);
+        btn.addEventListener("click", toggleHistoryExpanded);
+        return btn;
+      }
+
       function ensureCurrentEntry() {
         // Without a toolbar "Add entry" button, keep a blank draft available
         // so the Enter / field form is always the way to add transactions.
@@ -2078,8 +2189,8 @@
           '<span>Date</span><span>Description</span><span class="h-pay">Payment</span><span class="h-dep">Deposit</span><span></span>';
         history.appendChild(head);
 
-        let historyCount = 0;
         let formCard = null;
+        const priorTxns = [];
 
         // Newest entries first; balances still run oldest → newest in state.txns.
         // Entry form sits above history (between toolbar and saved rows).
@@ -2088,22 +2199,59 @@
 
           if (txn.id === formId) {
             formCard = buildTxnCard(txn, animateId);
+            tbodyEl.appendChild(buildDesktopRow(txn));
           } else if (!isBlankDraft(txn)) {
-            history.appendChild(buildHistoryRow(txn));
-            historyCount += 1;
+            priorTxns.push(txn);
           }
+        }
 
+        if (priorTxns.length <= HISTORY_VISIBLE) {
+          historyExpanded = false;
+        }
+
+        const visiblePriors = priorTxns.slice(0, HISTORY_VISIBLE);
+        const olderPriors = priorTxns.slice(HISTORY_VISIBLE);
+
+        visiblePriors.forEach(function (txn) {
+          history.appendChild(buildHistoryRow(txn));
           tbodyEl.appendChild(buildDesktopRow(txn));
+        });
+
+        if (olderPriors.length) {
+          history.appendChild(buildHistoryMoreButton(olderPriors));
+
+          const olderWrap = document.createElement("div");
+          olderWrap.className = "history-older";
+          olderWrap.hidden = !historyExpanded;
+          olderPriors.forEach(function (txn) {
+            olderWrap.appendChild(buildHistoryRow(txn));
+          });
+          history.appendChild(olderWrap);
+
+          const moreRow = document.createElement("tr");
+          moreRow.className = "history-more-row";
+          const moreCell = document.createElement("td");
+          moreCell.colSpan = 7;
+          moreCell.appendChild(buildHistoryMoreButton(olderPriors));
+          moreRow.appendChild(moreCell);
+          tbodyEl.appendChild(moreRow);
+
+          olderPriors.forEach(function (txn) {
+            const row = buildDesktopRow(txn);
+            row.classList.add("history-older-row");
+            row.hidden = !historyExpanded;
+            tbodyEl.appendChild(row);
+          });
         }
 
         if (formCard) {
           listEl.appendChild(formCard);
         }
-        if (historyCount) {
+        if (priorTxns.length) {
           listEl.appendChild(history);
         }
 
-        if (!formId && !historyCount) {
+        if (!formId && !priorTxns.length) {
           const empty = document.createElement("div");
           empty.className = "empty";
           empty.textContent = "No entries yet. Enter a name to start your register.";
