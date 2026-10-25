@@ -1679,7 +1679,8 @@
         }
 
         if (mode === "spend") {
-          const budget = findBudget(budgetModalTargetId);
+          const targetId = budgetModalTargetId;
+          const budget = findBudget(targetId);
           if (!budget) {
             closeBudgetModal();
             return;
@@ -1690,14 +1691,15 @@
             return;
           }
           closeBudgetModal();
-          spendFromBudget(budgetModalTargetId, amount);
+          spendFromBudget(targetId, amount);
           return;
         }
 
         if (mode === "add") {
+          const targetId = budgetModalTargetId;
           ensureUser(function (author) {
             closeBudgetModal();
-            addToBudget(budgetModalTargetId, amount, author);
+            addToBudget(targetId, amount, author);
           });
         }
       }
