@@ -346,6 +346,89 @@
       width: 100%;
     }
 
+    input[data-field="code"] {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      font-size: 1rem; /* >=16px avoids iOS focus zoom */
+    }
+
+    .code-meaning {
+      margin: 0;
+      font-size: 0.75rem;
+      line-height: 1.2;
+      color: var(--ink-soft);
+    }
+
+    .code-field .code-meaning { margin-top: 0.2rem; }
+
+    .code-meaning:empty { display: none; }
+
+    .code-choices {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .code-choice,
+    .code-menu-option {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.35rem;
+      margin: 0;
+      padding: 0.32rem 0.65rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 0.78rem;
+      font-weight: 500;
+      line-height: 1.2;
+      text-align: left;
+    }
+
+    .code-choice:hover,
+    .code-menu-option:hover,
+    .code-choice:focus-visible,
+    .code-menu-option:focus-visible {
+      border-color: var(--accent-bright);
+    }
+
+    .code-choice[aria-pressed="true"],
+    .code-menu-option[aria-selected="true"] {
+      border-color: var(--accent-bright);
+      background: rgba(45, 106, 90, 0.12);
+      color: var(--accent);
+    }
+
+    .code-choice-key {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .code-menu {
+      position: fixed;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.25rem;
+      width: max-content;
+      max-width: calc(100vw - 16px);
+      padding: 0.4rem;
+      background: #f7faf8;
+      border: 1px solid rgba(183, 199, 189, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 12px 28px rgba(20, 38, 31, 0.14);
+    }
+
+    .code-menu[hidden] { display: none; }
+
+    .code-menu-option {
+      width: 100%;
+      border-radius: 8px;
+    }
+
     /* Lock height so native date widgets match text/number fields. */
     .txn input {
       display: block;
@@ -496,6 +579,26 @@
       min-width: 0;
     }
 
+    .history-row .h-date {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.05rem;
+      white-space: normal;
+    }
+
+    .history-row .h-code {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.62rem;
+      font-weight: 600;
+      line-height: 1.15;
+      color: var(--accent);
+    }
+
     .history-row .h-pay,
     .history-row .h-dep {
       font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -629,7 +732,20 @@
       border-radius: 8px;
     }
 
-    .col-num { width: 7rem; }
+    .col-num { width: 8.5rem; }
+
+    table.register th.col-num { white-space: normal; }
+
+    .col-hint {
+      display: block;
+      margin-top: 0.12rem;
+      font-size: 0.62rem;
+      font-weight: 500;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--ink-soft);
+      line-height: 1.25;
+    }
     .col-date { width: 9.5rem; }
     .col-desc { min-width: 12rem; }
     .col-pay, .col-dep { width: 8.5rem; }
@@ -986,7 +1102,7 @@
         <table class="register" id="txn-table">
           <thead>
             <tr>
-              <th class="col-num">No. / Code</th>
+              <th class="col-num">No. / Code<span class="col-hint">dc Debit card<br>ac AppleCard</span></th>
               <th class="col-date">Date</th>
               <th class="col-desc">Transaction description</th>
               <th class="col-pay">Payment / fee / withdrawal</th>
@@ -1024,7 +1140,7 @@
       </div>
 
       <p class="hint">
-        Edits save in this browser and in the page URL hash. Backups are password-encrypted on your device before download. An optional PIN can lock the screen on this phone—it is a local barrier, not server-side security. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it. Sub-registers are budgeting envelopes: allocating posts a payment on the main register; clearing returns any leftover.
+        Edits save in this browser and in the page URL hash. New lines start with code dc (debit card); ac means AppleCard. A check number or any other note still works. Backups are password-encrypted on your device before download. An optional PIN can lock the screen on this phone—it is a local barrier, not server-side security. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it. Sub-registers are budgeting envelopes: allocating posts a payment on the main register; clearing returns any leftover.
       </p>
     </section>
   </div>
@@ -1130,6 +1246,84 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <script id="register-codes">
+    (function (root) {
+      var CODE_PRESETS = [
+        { code: "dc", label: "Debit card" },
+        { code: "ac", label: "AppleCard" },
+      ];
+      var DEFAULT_ENTRY_CODE = "dc";
+
+      function parseCheckNumber(code) {
+        var s = String(code || "").trim();
+        if (!/^\d+$/.test(s)) return null;
+        var n = Number(s);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function nextCheckCode(txns) {
+        var max = null;
+        (txns || []).forEach(function (txn) {
+          var n = parseCheckNumber(txn && txn.code);
+          if (n === null) return;
+          if (max === null || n > max) max = n;
+        });
+        return max === null ? "1001" : String(max + 1);
+      }
+
+      function codeSuggestions(txns) {
+        var items = CODE_PRESETS.map(function (preset) {
+          return { code: preset.code, label: preset.label };
+        });
+        items.push({ code: nextCheckCode(txns), label: "Next check" });
+        return items;
+      }
+
+      function suggestionTexts(item) {
+        return [
+          item.code + " \u2014 " + item.label,
+          item.code + " - " + item.label,
+          item.code + " \u2013 " + item.label,
+        ];
+      }
+
+      // Map a typed or picked value onto dc/ac (any capitalization) or the
+      // current "next check" suggestion. Anything else is returned unchanged
+      // so check numbers, BUDGET, and free-typed notes stay as entered.
+      function canonicalCode(raw, txns) {
+        var original = String(raw == null ? "" : raw);
+        var lower = original.trim().toLowerCase();
+        var suggestions = codeSuggestions(txns);
+        for (var i = 0; i < suggestions.length; i++) {
+          var item = suggestions[i];
+          if (lower === String(item.code).toLowerCase()) return item.code;
+          var texts = suggestionTexts(item);
+          for (var j = 0; j < texts.length; j++) {
+            if (lower === texts[j].toLowerCase()) return item.code;
+          }
+        }
+        return original;
+      }
+
+      function codeMeaningText(code) {
+        var key = String(code || "").trim().toLowerCase();
+        for (var i = 0; i < CODE_PRESETS.length; i++) {
+          if (CODE_PRESETS[i].code === key) return CODE_PRESETS[i].label;
+        }
+        return "";
+      }
+
+      root.RegisterCodes = {
+        CODE_PRESETS: CODE_PRESETS,
+        DEFAULT_ENTRY_CODE: DEFAULT_ENTRY_CODE,
+        parseCheckNumber: parseCheckNumber,
+        nextCheckCode: nextCheckCode,
+        codeSuggestions: codeSuggestions,
+        canonicalCode: canonicalCode,
+        codeMeaningText: codeMeaningText,
+      };
+    })(typeof window !== "undefined" ? window : globalThis);
+  </script>
   <script>
     (function () {
       const STORAGE_KEY = "digital-register-v1";
@@ -1188,6 +1382,9 @@
       let applyingHash = false;
       let editingId = null;
       let historyExpanded = false;
+      let openDraftDefaultApplied = false;
+      let codeMenuInput = null;
+      let codeMenuIgnoreScrollUntil = 0;
       let secretModalHandler = null;
       let budgetModalMode = null;
       let budgetModalTargetId = null;
@@ -1852,20 +2049,177 @@
       }
 
       function parseCheckNumber(code) {
-        const s = String(code || "").trim();
-        if (!/^\d+$/.test(s)) return null;
-        const n = Number(s);
-        return Number.isFinite(n) ? n : null;
+        return RegisterCodes.parseCheckNumber(code);
       }
 
-      function nextCheckCode() {
-        let max = null;
-        state.txns.forEach(function (txn) {
-          const n = parseCheckNumber(txn.code);
-          if (n === null) return;
-          if (max === null || n > max) max = n;
+      function canonicalCode(raw) {
+        return RegisterCodes.canonicalCode(raw, state.txns);
+      }
+
+      function codeMeaningText(code) {
+        return RegisterCodes.codeMeaningText(code);
+      }
+
+      function codeInputHtml(labelled) {
+        return (
+          '<input data-field="code" type="text" enterkeyhint="next" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="dc"' +
+          (labelled ? ' aria-label="No. / Code"' : "") +
+          ' aria-autocomplete="list" aria-controls="code-menu" aria-expanded="false" />'
+        );
+      }
+
+      function suggestionButton(item, className) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = className;
+        btn.setAttribute("data-code", item.code);
+        btn.setAttribute("aria-label", item.code + ", " + item.label);
+        const key = document.createElement("span");
+        key.className = "code-choice-key";
+        key.textContent = item.code;
+        const name = document.createElement("span");
+        name.textContent = item.label;
+        btn.appendChild(key);
+        btn.appendChild(name);
+        return btn;
+      }
+
+      function syncCodeUi(root) {
+        const input = root.querySelector('[data-field="code"]');
+        if (!input) return;
+        const meaning = codeMeaningText(input.value);
+        const meaningEl = root.querySelector("[data-code-meaning]");
+        if (meaningEl) meaningEl.textContent = meaning;
+        input.title = meaning
+          ? meaning
+          : "dc is Debit card, ac is AppleCard. A check number or other note still works.";
+        const current = String(input.value || "").trim().toLowerCase();
+        root.querySelectorAll(".code-choice").forEach(function (btn) {
+          const selected = String(btn.getAttribute("data-code") || "").toLowerCase() === current;
+          btn.setAttribute("aria-pressed", selected ? "true" : "false");
         });
-        return max === null ? "1001" : String(max + 1);
+      }
+
+      function closeCodeMenu() {
+        const menu = document.getElementById("code-menu");
+        if (menu) menu.hidden = true;
+        if (codeMenuInput) codeMenuInput.setAttribute("aria-expanded", "false");
+        codeMenuInput = null;
+      }
+
+      function desktopRegister() {
+        return window.matchMedia("(min-width: 780px)").matches;
+      }
+
+      function openCodeMenu(input) {
+        if (!desktopRegister()) return;
+        const menu = document.getElementById("code-menu");
+        if (!menu) return;
+        if (codeMenuInput && codeMenuInput !== input) {
+          codeMenuInput.setAttribute("aria-expanded", "false");
+        }
+        codeMenuInput = input;
+        menu.textContent = "";
+        const current = String(input.value || "").trim().toLowerCase();
+        RegisterCodes.codeSuggestions(state.txns).forEach(function (item) {
+          const btn = suggestionButton(item, "code-menu-option");
+          btn.setAttribute("role", "option");
+          if (item.code.toLowerCase() === current) btn.setAttribute("aria-selected", "true");
+          btn.addEventListener("mousedown", function (e) {
+            e.preventDefault();
+            input.value = item.code;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            closeCodeMenu();
+          });
+          menu.appendChild(btn);
+        });
+        menu.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        const anchor = input.closest(".code-field") || input;
+        const rect = anchor.getBoundingClientRect();
+        menu.style.minWidth = Math.max(rect.width, 190) + "px";
+        const menuHeight = menu.offsetHeight;
+        const menuWidth = menu.offsetWidth;
+        let top = rect.bottom + 4;
+        if (top + menuHeight > window.innerHeight - 8) {
+          top = Math.max(8, rect.top - menuHeight - 4);
+        }
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
+        menu.style.top = top + "px";
+        menu.style.left = left + "px";
+        codeMenuIgnoreScrollUntil = Date.now() + 250;
+      }
+
+      function setupCodeMenu() {
+        if (document.getElementById("code-menu")) return;
+        const menu = document.createElement("div");
+        menu.id = "code-menu";
+        menu.className = "code-menu";
+        menu.hidden = true;
+        menu.setAttribute("role", "listbox");
+        menu.setAttribute("aria-label", "Suggested codes");
+        document.body.appendChild(menu);
+        window.addEventListener("resize", closeCodeMenu);
+        window.addEventListener("scroll", function () {
+          if (Date.now() < codeMenuIgnoreScrollUntil) return;
+          closeCodeMenu();
+        }, true);
+      }
+
+      function insertCodeChoices(card) {
+        const wrap = document.createElement("div");
+        wrap.className = "code-choices";
+        wrap.setAttribute("role", "group");
+        wrap.setAttribute("aria-label", "Code suggestions");
+        RegisterCodes.codeSuggestions(state.txns).forEach(function (item) {
+          const btn = suggestionButton(item, "code-choice");
+          btn.setAttribute("aria-pressed", "false");
+          btn.addEventListener("click", function () {
+            const input = card.querySelector('[data-field="code"]');
+            if (!input) return;
+            input.value = item.code;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.focus();
+          });
+          wrap.appendChild(btn);
+        });
+        const meaningEl = card.querySelector("[data-code-meaning]");
+        if (meaningEl) meaningEl.insertAdjacentElement("afterend", wrap);
+        else card.appendChild(wrap);
+      }
+
+      function codeShouldSelect(value) {
+        const trimmed = String(value || "").trim();
+        if (!trimmed) return true;
+        if (codeMeaningText(trimmed)) return true;
+        return parseCheckNumber(trimmed) !== null;
+      }
+
+      function bindCodeMenu(input) {
+        input.addEventListener("focus", function () {
+          if (codeShouldSelect(input.value) && typeof input.select === "function") {
+            input.select();
+          }
+          if (!desktopRegister() || !input.closest("table")) return;
+          openCodeMenu(input);
+        });
+        // Keep a short code selected so the following key replaces it,
+        // including a second click while the field is already focused.
+        input.addEventListener("mouseup", function (e) {
+          if (!codeShouldSelect(input.value)) return;
+          e.preventDefault();
+          if (typeof input.select === "function") input.select();
+        });
+        input.addEventListener("blur", function () {
+          setTimeout(function () {
+            if (codeMenuInput === input) closeCodeMenu();
+          }, 180);
+        });
+        input.addEventListener("keydown", function (e) {
+          if (e.key !== "Escape" || !codeMenuInput) return;
+          e.preventDefault();
+          closeCodeMenu();
+        });
       }
 
       function isBlankDraft(txn) {
@@ -1939,6 +2293,12 @@
               value = parseMoney(value);
               txn[field] = value;
               onMoneyChange();
+            } else if (field === "code") {
+              value = canonicalCode(value);
+              if (e.target.value !== value) e.target.value = value;
+              txn.code = value;
+              const fieldRoot = e.target.closest(".txn, tr");
+              if (fieldRoot) syncCodeUi(fieldRoot);
             } else {
               txn[field] = value;
             }
@@ -1946,6 +2306,7 @@
           }
           el.addEventListener("input", onField);
           el.addEventListener("change", onField);
+          if (el.getAttribute("data-field") === "code") bindCodeMenu(el);
           el.addEventListener("keydown", function (e) {
             if (e.key !== "Enter") return;
             e.preventDefault();
@@ -1960,6 +2321,7 @@
         root.querySelector('[data-field="description"]').value = txn.description;
         root.querySelector('[data-field="payment"]').value = txn.payment ? String(txn.payment) : "";
         root.querySelector('[data-field="deposit"]').value = txn.deposit ? String(txn.deposit) : "";
+        syncCodeUi(root);
       }
 
       function buildTxnCard(txn, animateId) {
@@ -1968,9 +2330,10 @@
         card.dataset.id = txn.id;
         card.innerHTML =
           '<div class="txn-top">' +
-          '<div class="txn-field"><label>No. / Code</label><input data-field="code" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="1001" /></div>' +
+          '<div class="txn-field"><label>No. / Code</label>' + codeInputHtml(false) + "</div>" +
           '<div class="txn-field"><label>Date</label><input data-field="date" type="date" enterkeyhint="next" /></div>' +
           "</div>" +
+          '<p class="code-meaning" data-code-meaning></p>' +
           '<div class="txn-field"><label>Transaction description</label><input data-field="description" type="text" enterkeyhint="next" autocomplete="off" placeholder="Payee or memo" /></div>' +
           '<div class="txn-money">' +
           '<div class="txn-field"><label>Payment / fee / withdrawal</label><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="done" placeholder="0.00" /></div>' +
@@ -1981,6 +2344,7 @@
           '<button type="button" class="btn-danger" data-remove>Remove</button>' +
           "</div>";
 
+        insertCodeChoices(card);
         fillTxnFields(card, txn);
         bindFields(card, txn, updateBalancesOnly);
         card.querySelector("[data-enter]").addEventListener("click", function () {
@@ -1998,7 +2362,11 @@
         row.dataset.id = txn.id;
         row.setAttribute("role", "button");
         row.tabIndex = 0;
-        row.title = "Tap to edit";
+        const codeText = String(txn.code || "").trim();
+        const codeMeaning = codeMeaningText(txn.code);
+        row.title = codeText && codeMeaning
+          ? codeText + " — " + codeMeaning + ". Tap to edit"
+          : "Tap to edit";
 
         const pay = document.createElement("span");
         pay.className = "h-pay";
@@ -2010,7 +2378,16 @@
 
         const dateEl = document.createElement("span");
         dateEl.className = "h-date";
-        dateEl.textContent = formatShortDate(txn.date);
+        const dateText = document.createElement("span");
+        dateText.textContent = formatShortDate(txn.date);
+        dateEl.appendChild(dateText);
+        if (codeText) {
+          const codeSpan = document.createElement("span");
+          codeSpan.className = "h-code";
+          codeSpan.textContent = codeText;
+          if (codeMeaning) codeSpan.title = codeText + " — " + codeMeaning;
+          dateEl.appendChild(codeSpan);
+        }
 
         const descEl = document.createElement("span");
         descEl.className = "h-desc";
@@ -2060,7 +2437,8 @@
         const row = document.createElement("tr");
         row.dataset.id = txn.id;
         row.innerHTML =
-          '<td class="col-num"><input data-field="code" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="1001" /></td>' +
+          '<td class="col-num"><div class="code-field">' + codeInputHtml(true) +
+          '<p class="code-meaning" data-code-meaning></p></div></td>' +
           '<td class="col-date"><input data-field="date" type="date" enterkeyhint="next" /></td>' +
           '<td class="col-desc"><input data-field="description" type="text" enterkeyhint="next" autocomplete="off" placeholder="Payee or memo" /></td>' +
           '<td class="col-pay"><input data-field="payment" class="money" type="number" inputmode="decimal" step="0.01" enterkeyhint="done" placeholder="0.00" /></td>' +
@@ -2141,10 +2519,36 @@
         // Without a toolbar "Add entry" button, keep a blank draft available
         // so the Enter / field form is always the way to add transactions.
         if (!currentUser) return;
+        if (!openDraftDefaultApplied) {
+          // The open blank line is the new-entry form (backups already skip it).
+          // If it is still empty or only holds an automatic check number, start
+          // it at dc. Rows with a payee, an amount, or any non-numeric code
+          // are left exactly as stored.
+          openDraftDefaultApplied = true;
+          const openId = resolveEditingId();
+          let open = null;
+          if (openId) {
+            for (let i = 0; i < state.txns.length; i++) {
+              if (state.txns[i].id === openId) {
+                open = state.txns[i];
+                break;
+              }
+            }
+          }
+          if (open && isBlankDraft(open)) {
+            const existing = String(open.code || "").trim();
+            if (!existing || parseCheckNumber(existing) !== null) {
+              if (existing !== RegisterCodes.DEFAULT_ENTRY_CODE) {
+                open.code = RegisterCodes.DEFAULT_ENTRY_CODE;
+                persist(true);
+              }
+            }
+          }
+        }
         if (resolveEditingId()) return;
         const txn = {
           id: uid(),
-          code: nextCheckCode(),
+          code: RegisterCodes.DEFAULT_ENTRY_CODE,
           date: todayISO(),
           description: "",
           payment: 0,
@@ -2157,6 +2561,7 @@
       }
 
       function render(animateId) {
+        closeCodeMenu();
         ensureCurrentEntry();
         if (!state.budgets) state.budgets = [];
 
@@ -2290,7 +2695,7 @@
           const newest = state.txns.length ? state.txns[state.txns.length - 1] : null;
           if (newest && isBlankDraft(newest)) {
             if (!String(newest.code || "").trim()) {
-              newest.code = nextCheckCode();
+              newest.code = RegisterCodes.DEFAULT_ENTRY_CODE;
               persist(true);
             }
             editingId = newest.id;
@@ -2301,7 +2706,7 @@
 
           const txn = {
             id: uid(),
-            code: nextCheckCode(),
+            code: RegisterCodes.DEFAULT_ENTRY_CODE,
             date: todayISO(),
             description: "",
             payment: 0,
@@ -3043,6 +3448,7 @@
         navigator.storage.persist().catch(function () { /* ignore */ });
       }
 
+      setupCodeMenu();
       updatePinUi();
       if (hasPin() && !isSessionUnlocked()) {
         // Keep register data unloaded visually until PIN unlock.
