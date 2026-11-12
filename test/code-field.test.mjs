@@ -12,11 +12,11 @@ vm.runInNewContext(match[1], sandbox);
 const RC = sandbox.RegisterCodes;
 assert.ok(RC, "RegisterCodes should be defined");
 
-test("new entries default to dc, and dc/ac keep their meanings", () => {
+test("new entries default to dc, and saved ac lines still mean AppleCard", () => {
   assert.equal(RC.DEFAULT_ENTRY_CODE, "dc");
   assert.equal(
     Array.from(RC.CODE_PRESETS, function (preset) { return preset.code + "=" + preset.label; }).join(","),
-    "dc=Debit card,ac=AppleCard"
+    "dc=Debit card"
   );
   assert.equal(RC.codeMeaningText("dc"), "Debit card");
   assert.equal(RC.codeMeaningText("DC"), "Debit card");
@@ -24,10 +24,10 @@ test("new entries default to dc, and dc/ac keep their meanings", () => {
   assert.equal(RC.codeMeaningText("AC"), "AppleCard");
 });
 
-test("suggestions offer both codes and the next check number", () => {
+test("suggestions offer debit card and the next check number, not AppleCard", () => {
   assert.equal(
     Array.from(RC.codeSuggestions([]), function (item) { return item.code + "|" + item.label; }).join(","),
-    "dc|Debit card,ac|AppleCard,1001|Next check"
+    "dc|Debit card,1001|Next check"
   );
   assert.equal(
     Array.from(RC.codeSuggestions([
@@ -36,7 +36,11 @@ test("suggestions offer both codes and the next check number", () => {
       { code: "BUDGET" },
       { code: "ac" },
     ]), function (item) { return item.code; }).join(","),
-    "dc,ac,1009"
+    "dc,1009"
+  );
+  assert.equal(
+    RC.codeSuggestions([{ code: "ac" }]).some(function (item) { return String(item.code).toLowerCase() === "ac"; }),
+    false
   );
 });
 
@@ -54,8 +58,9 @@ test("known codes are normalized, and other values are left as typed", () => {
   assert.equal(RC.canonicalCode("dc", []), "dc");
   assert.equal(RC.canonicalCode(" DC ", []), "dc");
   assert.equal(RC.canonicalCode("ac", []), "ac");
+  assert.equal(RC.canonicalCode("AC", []), "AC");
   assert.equal(RC.canonicalCode("dc \u2014 Debit card", []), "dc");
-  assert.equal(RC.canonicalCode("AC - AppleCard", []), "ac");
+  assert.equal(RC.canonicalCode("AC - AppleCard", []), "AC - AppleCard");
   assert.equal(RC.canonicalCode("1001 \u2014 Next check", []), "1001");
   assert.equal(RC.canonicalCode("1001 - Next check", []), "1001");
 
@@ -63,6 +68,7 @@ test("known codes are normalized, and other values are left as typed", () => {
     { code: "1004" },
     { code: "BUDGET" },
     { code: "atm" },
+    { code: "ac" },
     { code: "1001 \u2014 rent" },
   ];
   saved.forEach(function (txn) {
@@ -91,4 +97,6 @@ test("loading a register does not rewrite stored codes", () => {
   assert.doesNotMatch(html, /code:\s*nextCheckCode\(\)/);
   const defaults = html.match(/code: RegisterCodes\.DEFAULT_ENTRY_CODE/g) || [];
   assert.ok(defaults.length >= 2, "new rows should be created with the default code");
+  assert.doesNotMatch(html, /ac AppleCard|ac means AppleCard|ac is AppleCard/);
+  assert.match(html, /label: "AppleCard"/);
 });

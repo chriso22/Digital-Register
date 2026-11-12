@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Digital Register" />
   <meta name="theme-color" content="#005057" />
-  <meta name="dr-app-version" content="aa679eb7" />
+  <meta name="dr-app-version" content="5c929b0f" />
   <title>Digital Register</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
@@ -1159,7 +1159,7 @@
         <table class="register" id="txn-table">
           <thead>
             <tr>
-              <th class="col-num">No. / Code<span class="col-hint">dc Debit card<br>ac AppleCard</span></th>
+              <th class="col-num">No. / Code<span class="col-hint">dc Debit card</span></th>
               <th class="col-date">Date</th>
               <th class="col-desc">Transaction description</th>
               <th class="col-pay">Payment / fee / withdrawal</th>
@@ -1197,9 +1197,9 @@
       </div>
 
       <p class="hint">
-        Edits save in this browser and in the page URL hash. New lines start with code dc (debit card); ac means AppleCard. A check number or any other note still works. Backups are password-encrypted on your device before download. An optional PIN can lock the screen on this phone—it is a local barrier, not server-side security. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it. Sub-registers are budgeting envelopes: allocating posts a payment on the main register; clearing returns any leftover.
+        Edits save in this browser and in the page URL hash. New lines start with code dc (debit card). A check number or any other note still works. Backups are password-encrypted on your device before download. An optional PIN can lock the screen on this phone—it is a local barrier, not server-side security. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it. Sub-registers are budgeting envelopes: allocating posts a payment on the main register; clearing returns any leftover.
       </p>
-      <p class="app-version">Version <span data-app-version>aa679eb7</span></p>
+      <p class="app-version">Version <span data-app-version>5c929b0f</span></p>
     </section>
   </div>
 
@@ -1218,7 +1218,7 @@
       />
       <p class="lock-error" id="lock-error" aria-live="polite"></p>
       <button type="button" class="btn-primary" id="lock-unlock">Unlock</button>
-      <p class="app-version">Version <span data-app-version>aa679eb7</span></p>
+      <p class="app-version">Version <span data-app-version>5c929b0f</span></p>
     </div>
   </div>
 
@@ -1309,6 +1309,10 @@
     (function (root) {
       var CODE_PRESETS = [
         { code: "dc", label: "Debit card" },
+      ];
+      // No longer offered as a choice. Kept only so a line already saved as
+      // "ac" still shows the same AppleCard label. Nothing here rewrites it.
+      var SAVED_CODE_MEANINGS = [
         { code: "ac", label: "AppleCard" },
       ];
       var DEFAULT_ENTRY_CODE = "dc";
@@ -1346,9 +1350,10 @@
         ];
       }
 
-      // Map a typed or picked value onto dc/ac (any capitalization) or the
+      // Map a typed or picked value onto dc (any capitalization) or the
       // current "next check" suggestion. Anything else is returned unchanged
-      // so check numbers, BUDGET, and free-typed notes stay as entered.
+      // so a saved AppleCard code, check numbers, BUDGET, and free-typed notes
+      // stay as entered.
       function canonicalCode(raw, txns) {
         var original = String(raw == null ? "" : raw);
         var lower = original.trim().toLowerCase();
@@ -1366,8 +1371,12 @@
 
       function codeMeaningText(code) {
         var key = String(code || "").trim().toLowerCase();
-        for (var i = 0; i < CODE_PRESETS.length; i++) {
-          if (CODE_PRESETS[i].code === key) return CODE_PRESETS[i].label;
+        var lists = [CODE_PRESETS, SAVED_CODE_MEANINGS];
+        for (var n = 0; n < lists.length; n++) {
+          var list = lists[n];
+          for (var i = 0; i < list.length; i++) {
+            if (list[i].code === key) return list[i].label;
+          }
         }
         return "";
       }
@@ -2151,7 +2160,7 @@
         if (meaningEl) meaningEl.textContent = meaning;
         input.title = meaning
           ? meaning
-          : "dc is Debit card, ac is AppleCard. A check number or other note still works.";
+          : "dc is Debit card. A check number or other note still works.";
         const current = String(input.value || "").trim().toLowerCase();
         root.querySelectorAll(".code-choice").forEach(function (btn) {
           const selected = String(btn.getAttribute("data-code") || "").toLowerCase() === current;
