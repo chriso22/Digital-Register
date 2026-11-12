@@ -3,7 +3,7 @@ importScripts("./pwa-update.js");
 // Stamped from the app files by scripts/stamp-pwa-version.mjs.
 // The browser only installs a new worker when this file changes, so the
 // version below has to change on every release that should reach installed apps.
-const APP_VERSION = "aa679eb7";
+const APP_VERSION = "5c929b0f";
 const CACHE_NAME = self.PwaUpdate.cacheNameFor(APP_VERSION);
 
 const ASSETS = [
