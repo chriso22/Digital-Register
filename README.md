@@ -31,6 +31,22 @@ Or open `index.html` directly in a browser.
 
 `.nojekyll` is included so Pages serves files as-is.
 
+## App updates
+
+Installed copies check for a new version when they open and when you switch back to them. If one is waiting, a banner says **New version available. Tap to update**. The version code is at the bottom of the register and on the PIN screen.
+
+That version is a short hash of the page, manifest, icons, and service worker. It is written in one place by:
+
+```bash
+node scripts/stamp-pwa-version.mjs
+```
+
+CI fails if the page changed and this stamp was not run. GitHub Pages serves the files as they are committed, so the stamp has to be in the commit.
+
+Saved registers stay in this browser (`localStorage` and the page link). An update reloads the app shell only. It does not clear or migrate entries, the PIN, or backups.
+
+The Home Screen icon created before this updater existed still has no way to notice a new version. Remove that icon and add the site once more. After that, use the banner.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

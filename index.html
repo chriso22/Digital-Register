@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Digital Register" />
   <meta name="theme-color" content="#005057" />
+  <meta name="dr-app-version" content="aa679eb7" />
   <title>Digital Register</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
@@ -779,6 +780,61 @@
       line-height: 1.4;
     }
 
+    .app-version {
+      margin: 0.85rem 0 0;
+      font-size: 0.75rem;
+      letter-spacing: 0.01em;
+      color: var(--ink-soft);
+    }
+
+    .lock-card .app-version {
+      margin: 1rem 0 0;
+      color: rgba(238, 243, 239, 0.55);
+    }
+
+    .update-banner {
+      position: fixed;
+      z-index: 70;
+      top: calc(0.65rem + var(--safe-top));
+      left: 50%;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: calc(100vw - 1.5rem);
+      margin: 0;
+      border: 0;
+      border-radius: 999px;
+      padding: 0.7rem 1.05rem;
+      background: var(--accent);
+      color: #f4faf7;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.3;
+      text-align: center;
+      white-space: normal;
+      box-shadow: 0 12px 28px rgba(20, 38, 31, 0.22);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s ease;
+    }
+
+    .update-banner:active {
+      transform: translateX(-50%) scale(0.97);
+    }
+
+    .update-banner:focus-visible {
+      outline: 3px solid #f4faf7;
+      outline-offset: 2px;
+    }
+
+    .update-banner[hidden] {
+      display: none !important;
+    }
+
+    body.update-ready {
+      padding-top: calc(4.4rem + var(--safe-top));
+    }
+
     .user-bar {
       display: flex;
       flex-wrap: wrap;
@@ -1061,6 +1117,7 @@
   </style>
 </head>
 <body>
+  <button type="button" id="update-banner" class="update-banner" hidden>New version available. Tap to update</button>
   <div class="app">
     <header>
       <h1 class="brand">Digital Register</h1>
@@ -1142,6 +1199,7 @@
       <p class="hint">
         Edits save in this browser and in the page URL hash. New lines start with code dc (debit card); ac means AppleCard. A check number or any other note still works. Backups are password-encrypted on your device before download. An optional PIN can lock the screen on this phone—it is a local barrier, not server-side security. Re-opening an older share link will not wipe a newer register already on this device. Each entry notes who added it. Sub-registers are budgeting envelopes: allocating posts a payment on the main register; clearing returns any leftover.
       </p>
+      <p class="app-version">Version <span data-app-version>aa679eb7</span></p>
     </section>
   </div>
 
@@ -1160,6 +1218,7 @@
       />
       <p class="lock-error" id="lock-error" aria-live="polite"></p>
       <button type="button" class="btn-primary" id="lock-unlock">Unlock</button>
+      <p class="app-version">Version <span data-app-version>aa679eb7</span></p>
     </div>
   </div>
 
@@ -3440,6 +3499,7 @@
 
       window.addEventListener("pagehide", flushPersist);
       window.addEventListener("beforeunload", flushPersist);
+      window.addEventListener("digital-register-flush", flushPersist);
       document.addEventListener("visibilitychange", function () {
         if (document.visibilityState === "hidden") flushPersist();
       });
@@ -3456,6 +3516,102 @@
       } else {
         startApp();
       }
+    })();
+  </script>
+  <script src="pwa-update.js"></script>
+  <script id="pwa-register">
+    (function () {
+      var meta = document.querySelector('meta[name="dr-app-version"]');
+      var currentVersion = meta ? (meta.getAttribute("content") || "") : "";
+      document.querySelectorAll("[data-app-version]").forEach(function (node) {
+        if (currentVersion) node.textContent = currentVersion;
+      });
+
+      var banner = document.getElementById("update-banner");
+      if (!("serviceWorker" in navigator) || !window.PwaUpdate) return;
+
+      var updateRequested = false;
+      var reloading = false;
+
+      function snapshot(registration) {
+        return {
+          controllerExists: !!navigator.serviceWorker.controller,
+          hasWaitingWorker: !!(registration && registration.waiting),
+        };
+      }
+
+      function sync(registration) {
+        var action = window.PwaUpdate.updateAction(snapshot(registration));
+        if (action === "prompt") {
+          if (banner) banner.hidden = false;
+          document.body.classList.add("update-ready");
+          return;
+        }
+        if (action === "activate" && registration.waiting) {
+          registration.waiting.postMessage({ type: window.PwaUpdate.SKIP_WAITING });
+          return;
+        }
+        if (banner) banner.hidden = true;
+        document.body.classList.remove("update-ready");
+      }
+
+      function watch(registration, worker) {
+        if (!worker) return;
+        worker.addEventListener("statechange", function () {
+          if (worker.state === "installed" || worker.state === "activated") sync(registration);
+        });
+      }
+
+      // Reload only after the banner is tapped. This flag stays in memory so the
+      // freshly loaded page does not immediately reload again.
+      navigator.serviceWorker.addEventListener("controllerchange", function () {
+        if (!updateRequested || reloading) return;
+        reloading = true;
+        try {
+          window.dispatchEvent(new Event("digital-register-flush"));
+        } catch (e) { /* ignore */ }
+        window.location.reload();
+      });
+
+      if (banner) {
+        banner.addEventListener("click", function () {
+          navigator.serviceWorker.getRegistration().then(function (registration) {
+            if (!registration || !registration.waiting) return;
+            updateRequested = true;
+            registration.waiting.postMessage({ type: window.PwaUpdate.SKIP_WAITING });
+          }).catch(function () { /* ignore */ });
+        });
+      }
+
+      function check(registration) {
+        var pending = registration.update();
+        if (!pending || !pending.then) {
+          sync(registration);
+          return;
+        }
+        pending.then(function () { sync(registration); }, function () { sync(registration); });
+      }
+
+      function onReady(registration) {
+        watch(registration, registration.installing);
+        watch(registration, registration.waiting);
+        registration.addEventListener("updatefound", function () {
+          watch(registration, registration.installing);
+        });
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") check(registration);
+        });
+        window.addEventListener("pageshow", function () { check(registration); });
+        check(registration);
+      }
+
+      function register(options) {
+        return navigator.serviceWorker.register("./sw.js", options);
+      }
+
+      register({ scope: "./", updateViaCache: "none" }).then(onReady, function () {
+        return register({ scope: "./" }).then(onReady);
+      }).catch(function () { /* the register still works if the worker cannot install */ });
     })();
   </script>
 </body>
